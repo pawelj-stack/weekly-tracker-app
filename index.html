@@ -3,7 +3,19 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Weekly Project Tracker & AI Parser</title>
+  <title>Weekly Project Tracker — Firebase</title>
+
+  <!-- FIREBASE CONFIG: replace ONLY the values below with your web app's config. -->
+  <script>
+    window.TRACKER_FIREBASE_CONFIG = {
+      apiKey: "PASTE_YOUR_API_KEY",
+      authDomain: "PASTE_YOUR_AUTH_DOMAIN",
+      projectId: "PASTE_YOUR_PROJECT_ID",
+      storageBucket: "PASTE_YOUR_STORAGE_BUCKET",
+      messagingSenderId: "PASTE_YOUR_SENDER_ID",
+      appId: "PASTE_YOUR_FIREBASE_APP_ID"
+    };
+  </script>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/lucide@0.344.0/dist/umd/lucide.min.js"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -100,26 +112,37 @@
       text-decoration: line-through;
       color: #94a3b8 !important;
     }
-	// Import the functions you need from the SDKs you need
-import { initializeApp } from "firebase/app";
-// TODO: Add SDKs for Firebase products that you want to use
-// https://firebase.google.com/docs/web/setup#available-libraries
-
-// Your web app's Firebase configuration
-const firebaseConfig = {
-  apiKey: "AIzaSyCLEUbzdFZ9HNEcCwrkZkSkl5yRZL_NCFE",
-  authDomain: "weekly-tracker-app.firebaseapp.com",
-  projectId: "weekly-tracker-app",
-  storageBucket: "weekly-tracker-app.firebasestorage.app",
-  messagingSenderId: "1072251441232",
-  appId: "1:1072251441232:web:27378a59dcf18f1204c155"
-};
-
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
   </style>
 </head>
 <body class="h-full flex flex-col font-sans text-slate-800 antialiased overflow-x-hidden">
+
+
+  <section id="loginPanel" class="fixed inset-0 z-40 bg-slate-50 flex items-center justify-center p-6">
+    <div class="bg-white border border-slate-200 rounded-xl shadow-lg p-6 w-full max-w-md">
+      <h2 class="text-xl font-bold mb-2">Weekly Project Tracker</h2>
+      <p class="text-sm text-slate-600 mb-4">Sign in with the tracker account created in Firebase.</p>
+      <p id="loginMessage" role="status" class="text-sm text-slate-600 mb-4">Loading libraries… This needs an internet connection. If this message stays here, check your connection and reload.</p>
+      <form id="loginForm" class="space-y-3">
+        <label class="block text-sm">Email<input id="loginEmail" type="email" autocomplete="username" required class="block border rounded-lg w-full p-2 mt-1"></label>
+        <label class="block text-sm">Password<input id="loginPassword" type="password" autocomplete="current-password" required class="block border rounded-lg w-full p-2 mt-1"></label>
+        <button id="loginBtn" disabled type="submit" class="bg-indigo-600 text-white rounded-lg w-full p-2 disabled:opacity-50">Sign in</button>
+      </form>
+      <button id="loginSignOutBtn" class="hidden text-sm underline mt-3">Sign out and use another account</button>
+    </div>
+  </section>
+  <div id="connectionNotice" role="status" class="hidden bg-amber-50 text-amber-900 border-b border-amber-200 px-6 py-3 text-sm"></div>
+  <div id="databaseModal" class="hidden fixed inset-0 z-40 bg-slate-900/40 flex items-center justify-center p-4">
+    <section class="bg-white rounded-xl shadow-xl p-6 w-full max-w-lg space-y-4">
+      <h2 class="font-bold text-lg">Database & backup</h2>
+      <p class="text-sm text-slate-600">The database is shared by approved team accounts. Your old browser data is imported only when you choose to import it.</p>
+      <button id="importLocalBtn" class="block w-full border rounded-lg p-2 text-sm">Import old data from this browser</button>
+      <label class="block text-sm">Or import a JSON backup<input id="importBackupFile" type="file" accept=".json,application/json" class="block mt-2 text-sm"></label>
+      <p class="text-xs text-slate-500">Import is available only while the database has no tasks and has not previously been imported or reset. The old local data stays untouched.</p>
+      <button id="exportBackupBtn" class="block w-full bg-indigo-600 text-white rounded-lg p-2 text-sm">Download full JSON backup</button>
+      <p class="text-xs text-slate-500">A new database starts empty. To use the original example tasks instead, use Settings → Reset to default data.</p>
+      <button id="closeDatabaseModalBtn" class="text-sm underline">Close</button>
+    </section>
+  </div>
 
   <!-- Header -->
   <header class="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-xs">
@@ -133,11 +156,11 @@ const app = initializeApp(firebaseConfig);
           <div class="flex items-center gap-2">
             <h1 class="text-sm font-bold text-slate-900 tracking-tight leading-tight">Weekly Project Tracker</h1>
             <span class="text-[10px] px-2 py-0.5 rounded-full font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200">
-              6 Clients &bull; 6 Specialists
+              <span id="teamCounts">Team tracker</span>
             </span>
             <span id="syncBadge" class="text-[10px] px-2 py-0.5 rounded-full font-medium bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1">
               <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-              <span id="syncText">Ready</span>
+              <span id="syncText">Connecting…</span>
             </span>
           </div>
           <p class="text-[11px] text-slate-500 hidden sm:block">Monday Status &bull; Priorities &amp; Blockers &bull; Thursday Verification</p>
@@ -146,9 +169,13 @@ const app = initializeApp(firebaseConfig);
 
       <!-- Action Buttons -->
       <div class="flex items-center flex-wrap gap-2">
-        <button id="openParseBtn" class="bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white text-xs font-semibold px-3 py-1.5 rounded-lg shadow-sm flex items-center gap-1.5 transition-all cursor-pointer">
+        
+        <button id="databaseToolsBtn" class="bg-white border border-slate-300 text-slate-700 text-xs px-3 py-1.5 rounded-lg">Database & backup</button>
+        <span id="signedInEmail" class="text-xs text-slate-500"></span>
+        <button id="signOutBtn" class="hidden text-xs text-slate-600 underline">Sign out</button>
+<button id="openParseBtn" class="bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white text-xs font-semibold px-3 py-1.5 rounded-lg shadow-sm flex items-center gap-1.5 transition-all cursor-pointer">
           <i data-lucide="sparkles" class="w-3.5 h-3.5"></i>
-          <span>Parse Transcript</span>
+          <span>Import Transcript</span>
         </button>
 
         <button id="openAddModalBtn" class="bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer shadow-2xs">
@@ -309,7 +336,7 @@ const app = initializeApp(firebaseConfig);
           <i data-lucide="inbox" class="w-6 h-6"></i>
         </div>
         <p class="font-bold text-slate-800 text-sm">No tasks match your filter criteria</p>
-        <p class="text-xs text-slate-500 mt-1 max-w-sm">Try adjusting your filters or click "+ Add Task" or "Parse Transcript" to add tasks.</p>
+        <p class="text-xs text-slate-500 mt-1 max-w-sm">Try adjusting your filters or click "+ Add Task" or "Import Transcript" to add tasks.</p>
         <button id="resetFiltersBtn" class="mt-3 text-xs text-indigo-600 font-semibold hover:underline cursor-pointer">Reset All Filters</button>
       </div>
     </div>
@@ -517,18 +544,17 @@ const app = initializeApp(firebaseConfig);
   <div id="toastContainer" class="fixed bottom-4 right-4 z-50 flex flex-col gap-2 pointer-events-none"></div>
 
   <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-    import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-    import { getFirestore, doc, setDoc, deleteDoc, onSnapshot, collection } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-const firebaseConfig = {
-  apiKey: "AIzaSyCLEUbzdFZ9HNEcCwrkZkSkl5yRZL_NCFE",
-  authDomain: "weekly-tracker-app.firebaseapp.com",
-  projectId: "weekly-tracker-app",
-  storageBucket: "weekly-tracker-app.firebasestorage.app",
-  messagingSenderId: "1072251441232",
-  appId: "1:1072251441232:web:27378a59dcf18f1204c155"
-};
-const app = initializeApp(firebaseConfig);
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js";
+    import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut, setPersistence, browserSessionPersistence } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js";
+    import { getFirestore, doc, onSnapshot, collection, runTransaction, getDocFromServer, getDocsFromServer } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js";
+
+    const firebaseConfig = window.TRACKER_FIREBASE_CONFIG;
+    const TRACKER_APP_ID = 'weekly-project-tracker';
+    function mondayToday() {
+      const d = new Date();
+      d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
+      return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    }
     const INITIAL_PROJECTS = ["SAXO", "Trener", "Translyft", "OnRobot", "Maigaard", "Exante"];
     const INITIAL_SPECIALISTS = [
       "Paweł (Project Manager)",
@@ -883,119 +909,47 @@ const app = initializeApp(firebaseConfig);
     const AppState = {
       projects: [...INITIAL_PROJECTS],
       specialists: [...INITIAL_SPECIALISTS],
-      tasks: INITIAL_TASKS.map(sanitizeTask),
-      availableWeeks: ["2026-09-28"],
-      currentWeek: "2026-09-28",
+      tasks: [],
+      availableWeeks: [mondayToday()],
+      currentWeek: mondayToday(),
       activeWorkflowFilter: "ALL", // 'ALL' | 'MONDAY' | 'THURSDAY' | 'BLOCKED'
       selectedTaskIds: new Set(),
       db: null,
       auth: null,
       currentUser: null,
-      appId: typeof __app_id !== 'undefined' ? __app_id : 'default-tracker-app',
+      appId: TRACKER_APP_ID,
       isCloudConnected: false,
 
       getNextTaskId() {
-        return 'TSK-' + String(Date.now()).slice(-6);
+        return 'TSK-' + crypto.randomUUID();
       },
-
-      loadLocalBackup() {
-        try {
-          const savedTasks = localStorage.getItem('wpt_saved_tasks_v4');
-          if (savedTasks) {
-            const parsed = JSON.parse(savedTasks);
-            if (Array.isArray(parsed) && parsed.length > 0) {
-              this.tasks = parsed.map(sanitizeTask);
-            }
-          }
-          const savedWeeks = localStorage.getItem('wpt_saved_weeks_v4');
-          if (savedWeeks) {
-            const parsedWeeks = JSON.parse(savedWeeks);
-            if (Array.isArray(parsedWeeks) && parsedWeeks.length > 0) {
-              this.availableWeeks = parsedWeeks;
-            }
-          }
-          const savedProjects = localStorage.getItem('wpt_saved_projects_v4');
-          if (savedProjects) {
-            const parsedP = JSON.parse(savedProjects);
-            if (Array.isArray(parsedP) && parsedP.length > 0) {
-              this.projects = parsedP;
-            }
-          }
-          const savedSpecialists = localStorage.getItem('wpt_saved_specialists_v4');
-          if (savedSpecialists) {
-            const parsedS = JSON.parse(savedSpecialists);
-            if (Array.isArray(parsedS) && parsedS.length > 0) {
-              this.specialists = parsedS;
-            }
-          }
-        } catch (e) {
-          console.warn("Local backup load error:", e);
-        }
-      },
-
-      persistLocalBackup() {
-        try {
-          localStorage.setItem('wpt_saved_tasks_v4', JSON.stringify(this.tasks));
-          localStorage.setItem('wpt_saved_weeks_v4', JSON.stringify(this.availableWeeks));
-          localStorage.setItem('wpt_saved_projects_v4', JSON.stringify(this.projects));
-          localStorage.setItem('wpt_saved_specialists_v4', JSON.stringify(this.specialists));
-        } catch (e) {
-          console.warn("Local storage write error:", e);
-        }
-      },
-
       async saveTask(task) {
         const clean = sanitizeTask(task);
+        validateTask(clean);
+        await databaseWrite(async tx => tx.set(taskRef(clean.id), clean));
         const idx = this.tasks.findIndex(t => t.id === clean.id);
-        if (idx >= 0) {
-          this.tasks[idx] = clean;
-        } else {
-          this.tasks.unshift(clean);
-        }
-
-        // Always write to local storage backup immediately
-        this.persistLocalBackup();
-
-        // Sync to cloud Firestore when connected
-        if (this.isCloudConnected && this.currentUser && this.db) {
-          try {
-            const taskRef = doc(this.db, 'artifacts', this.appId, 'public', 'data', 'tasks', clean.id);
-            await setDoc(taskRef, clean);
-          } catch (err) {
-            console.error("Cloud save task error:", err);
-          }
-        }
+        if (idx >= 0) this.tasks[idx] = clean;
+        else this.tasks.unshift(clean);
       },
-
       async deleteTask(taskId) {
+        await databaseWrite(async tx => tx.delete(taskRef(taskId)));
         this.tasks = this.tasks.filter(t => t.id !== taskId);
         this.selectedTaskIds.delete(taskId);
-        this.persistLocalBackup();
-
-        if (this.isCloudConnected && this.currentUser && this.db) {
-          try {
-            const taskRef = doc(this.db, 'artifacts', this.appId, 'public', 'data', 'tasks', taskId);
-            await deleteDoc(taskRef);
-          } catch (err) {
-            console.error("Cloud delete error:", err);
-          }
-        }
       },
-
       async saveSettings() {
-        this.persistLocalBackup();
-        if (this.isCloudConnected && this.currentUser && this.db) {
-          try {
-            const configRef = doc(this.db, 'artifacts', this.appId, 'public', 'data', 'config', 'settings');
-            await setDoc(configRef, {
-              projects: this.projects,
-              specialists: this.specialists,
-              availableWeeks: this.availableWeeks
-            }, { merge: true });
-          } catch (err) {
-            console.error("Cloud save settings error:", err);
+        const proposed = settingsData();
+        const baseline = structuredClone(committedSettings || proposed);
+        await databaseWrite(async (tx, latest) => {
+          // Apply this user's additions/removals to the most recent database lists.
+          const merged = {};
+          for (const key of ['projects', 'specialists', 'availableWeeks']) {
+            const added = proposed[key].filter(v => !baseline[key].includes(v));
+            const removed = baseline[key].filter(v => !proposed[key].includes(v));
+            merged[key] = [...new Set([...(latest[key] || []).filter(v => !removed.includes(v)), ...added])];
+            if (!merged[key].length) throw new Error('Keep at least one project, specialist and week.');
           }
-        }
+          tx.set(configRef(), merged, { merge: true });
+        });
       }
     };
 
@@ -1067,9 +1021,9 @@ const app = initializeApp(firebaseConfig);
       const currentVal = weekSelect.value || AppState.currentWeek;
       weekSelect.innerHTML = `<option value="ALL">All Weeks (${AppState.availableWeeks.length})</option>`;
       AppState.availableWeeks.forEach(w => {
-        weekSelect.innerHTML += `<option value="${w}">${w}</option>`;
+        weekSelect.innerHTML += `<option value="${escapeHtml(w)}">${escapeHtml(w)}</option>`;
       });
-      weekSelect.value = AppState.availableWeeks.includes(currentVal) ? currentVal : (AppState.availableWeeks[0] || "2026-09-28");
+      weekSelect.value = (currentVal === 'ALL' || AppState.availableWeeks.includes(currentVal)) ? currentVal : (AppState.availableWeeks[0] || "2026-09-28");
       AppState.currentWeek = weekSelect.value;
 
       // Project Filter
@@ -1077,36 +1031,41 @@ const app = initializeApp(firebaseConfig);
       const curProj = projectFilter.value || 'ALL';
       projectFilter.innerHTML = `<option value="ALL">All Projects (${AppState.projects.length})</option>`;
       AppState.projects.forEach(p => {
-        projectFilter.innerHTML += `<option value="${p}">${p}</option>`;
+        projectFilter.innerHTML += `<option value="${escapeHtml(p)}">${escapeHtml(p)}</option>`;
       });
-      projectFilter.value = curProj;
+      projectFilter.value = AppState.projects.includes(curProj) ? curProj : 'ALL';
 
       // Specialist Filter
       const specFilter = document.getElementById('specialistFilter');
       const curSpec = specFilter.value || 'ALL';
       specFilter.innerHTML = `<option value="ALL">All Specialists (${AppState.specialists.length})</option>`;
       AppState.specialists.forEach(s => {
-        specFilter.innerHTML += `<option value="${s}">${s}</option>`;
+        specFilter.innerHTML += `<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`;
       });
-      specFilter.value = curSpec;
+      specFilter.value = AppState.specialists.includes(curSpec) ? curSpec : 'ALL';
 
       // Modal Dropdowns
+      const previousProject = document.getElementById('modalProject').value;
+      const previousSpecialist = document.getElementById('modalSpecialist').value;
       const modalProject = document.getElementById('modalProject');
       modalProject.innerHTML = '';
       AppState.projects.forEach(p => {
-        modalProject.innerHTML += `<option value="${p}">${p}</option>`;
+        modalProject.innerHTML += `<option value="${escapeHtml(p)}">${escapeHtml(p)}</option>`;
       });
 
       const modalSpecialist = document.getElementById('modalSpecialist');
       modalSpecialist.innerHTML = '';
       AppState.specialists.forEach(s => {
-        modalSpecialist.innerHTML += `<option value="${s}">${s}</option>`;
+        modalSpecialist.innerHTML += `<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`;
       });
 
+      if (AppState.projects.includes(previousProject)) modalProject.value = previousProject;
+      if (AppState.specialists.includes(previousSpecialist)) modalSpecialist.value = previousSpecialist;
+      document.getElementById('teamCounts').textContent = `${AppState.projects.length} clients • ${AppState.specialists.length} specialists`;
       // Update date picker defaults
       const validWeek = AppState.currentWeek !== 'ALL' ? AppState.currentWeek : (AppState.availableWeeks[0] || "2026-09-28");
-      document.getElementById('modalWeekOf').value = validWeek;
-      document.getElementById('parseTargetWeek').value = validWeek;
+      if (document.getElementById('taskModal').classList.contains('hidden')) document.getElementById('modalWeekOf').value = validWeek;
+      if (document.getElementById('parseModal').classList.contains('hidden')) document.getElementById('parseTargetWeek').value = validWeek;
     }
 
     function getFilteredTasks() {
@@ -1129,7 +1088,7 @@ const app = initializeApp(firebaseConfig);
 
         // Free search
         if (searchTerm) {
-          const hay = `${task.project} ${task.specialist} ${task.description} ${task.blockers} ${task.status}`.toLowerCase();
+          const hay = `${escapeHtml(task.project)} ${escapeHtml(task.specialist)} ${task.description} ${task.blockers} ${task.status}`.toLowerCase();
           if (!hay.includes(searchTerm)) return false;
         }
 
@@ -1183,25 +1142,25 @@ const app = initializeApp(firebaseConfig);
 
         tr.innerHTML = `
           <td class="py-2.5 px-1.5 text-center">
-            <input type="checkbox" data-task-select="${task.id}" class="w-3.5 h-3.5 rounded text-indigo-600 focus:ring-indigo-500 border-slate-300 cursor-pointer" ${isChecked ? 'checked' : ''}>
+            <input type="checkbox" data-task-select="${escapeHtml(task.id)}" class="w-3.5 h-3.5 rounded text-indigo-600 focus:ring-indigo-500 border-slate-300 cursor-pointer" ${isChecked ? 'checked' : ''}>
           </td>
           <td class="py-2.5 px-1.5 text-slate-600 font-mono text-[11px] truncate">
             <div class="flex items-center gap-1">
-              <span>${task.weekOf}</span>
-              ${task.rolledOverFrom ? '<span title="Rolled over from ' + task.rolledOverFrom + '" class="text-[9px] font-sans font-bold bg-amber-100 text-amber-800 px-1 rounded">Rolled</span>' : ''}
+              <span>${escapeHtml(task.weekOf)}</span>
+              ${task.rolledOverFrom ? '<span title="Rolled over from ' + escapeHtml(task.rolledOverFrom) + '" class="text-[9px] font-sans font-bold bg-amber-100 text-amber-800 px-1 rounded">Rolled</span>' : ''}
             </div>
           </td>
           <td class="py-2.5 px-2">
-            <span class="font-bold text-slate-900 px-2 py-0.5 bg-slate-100 rounded-md border border-slate-200/70 block truncate text-[11px]" title="${task.project}">
-              ${task.project}
+            <span class="font-bold text-slate-900 px-2 py-0.5 bg-slate-100 rounded-md border border-slate-200/70 block truncate text-[11px]" title="${escapeHtml(task.project)}">
+              ${escapeHtml(task.project)}
             </span>
           </td>
           <td class="py-2.5 px-2 text-slate-700">
-            <div class="flex items-center gap-1.5 min-w-0" title="${task.specialist}">
+            <div class="flex items-center gap-1.5 min-w-0" title="${escapeHtml(task.specialist)}">
               <span class="w-5 h-5 flex-shrink-0 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-[10px]">
-                ${task.specialist.charAt(0)}
+                ${escapeHtml(task.specialist.charAt(0))}
               </span>
-              <span class="truncate text-[11px] font-medium">${task.specialist}</span>
+              <span class="truncate text-[11px] font-medium">${escapeHtml(task.specialist)}</span>
             </div>
           </td>
           <td class="py-2.5 px-3 text-slate-800 leading-snug">
@@ -1210,7 +1169,7 @@ const app = initializeApp(firebaseConfig);
             </p>
           </td>
           <td class="py-2.5 px-1.5">
-            <select data-action="change-priority" data-id="${task.id}" class="clean-select w-full text-[11px] font-medium py-1 px-1.5 rounded-lg border cursor-pointer focus:outline-none focus:ring-1 focus:ring-indigo-500 ${getPriorityClass(task.priority)}">
+            <select data-action="change-priority" data-id="${escapeHtml(task.id)}" class="clean-select w-full text-[11px] font-medium py-1 px-1.5 rounded-lg border cursor-pointer focus:outline-none focus:ring-1 focus:ring-indigo-500 ${getPriorityClass(task.priority)}">
               <option value="Low" ${task.priority === 'Low' ? 'selected' : ''}>Low</option>
               <option value="Medium" ${task.priority === 'Medium' ? 'selected' : ''}>Medium</option>
               <option value="High" ${task.priority === 'High' ? 'selected' : ''}>High</option>
@@ -1218,7 +1177,7 @@ const app = initializeApp(firebaseConfig);
             </select>
           </td>
           <td class="py-2.5 px-1.5">
-            <select data-action="change-status" data-id="${task.id}" class="clean-select w-full text-[11px] font-semibold py-1 px-1.5 rounded-lg border cursor-pointer focus:outline-none focus:ring-1 focus:ring-indigo-500 ${getStatusClass(task.status)}">
+            <select data-action="change-status" data-id="${escapeHtml(task.id)}" class="clean-select w-full text-[11px] font-semibold py-1 px-1.5 rounded-lg border cursor-pointer focus:outline-none focus:ring-1 focus:ring-indigo-500 ${getStatusClass(task.status)}">
               <option value="Planning" ${task.status === 'Planning' ? 'selected' : ''}>Planning</option>
               <option value="In Progress" ${task.status === 'In Progress' ? 'selected' : ''}>In Progress</option>
               <option value="Blocked" ${task.status === 'Blocked' ? 'selected' : ''}>Blocked</option>
@@ -1227,7 +1186,7 @@ const app = initializeApp(firebaseConfig);
             </select>
           </td>
           <td class="py-2.5 px-1.5">
-            <input type="date" data-action="change-deadline" data-id="${task.id}" value="${task.deadline || ''}" class="w-full bg-slate-50 hover:bg-white border border-slate-200 rounded px-1 py-1 font-mono text-[10px] text-slate-700 focus:outline-none focus:ring-1 focus:ring-indigo-500 cursor-pointer" title="Due deadline">
+            <input type="date" data-action="change-deadline" data-id="${escapeHtml(task.id)}" value="${escapeHtml(task.deadline || '')}" class="w-full bg-slate-50 hover:bg-white border border-slate-200 rounded px-1 py-1 font-mono text-[10px] text-slate-700 focus:outline-none focus:ring-1 focus:ring-indigo-500 cursor-pointer" title="Due deadline">
           </td>
           <td class="py-2.5 px-2 text-slate-600 text-[11px]">
             <span class="break-words ${task.blockers && task.blockers !== 'None' ? 'text-rose-700 font-semibold' : 'text-slate-400 font-normal'}" title="${escapeHtml(task.blockers || 'None')}">
@@ -1235,26 +1194,26 @@ const app = initializeApp(firebaseConfig);
             </span>
           </td>
           <td class="py-2.5 px-1.5 text-center">
-            ${task.attachment && task.attachment.trim() ? `
-              <a href="${escapeHtml(task.attachment)}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-[10px] font-semibold transition-colors" title="${escapeHtml(task.attachment)}">
+            ${safeLink(task.attachment) ? `
+              <a href="${escapeHtml(safeLink(task.attachment))}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-[10px] font-semibold transition-colors" title="${escapeHtml(task.attachment)}">
                 <i data-lucide="paperclip" class="w-3 h-3"></i>
                 <span>Open</span>
               </a>
             ` : `
-              <button data-action="quick-attach" data-id="${task.id}" class="text-slate-300 hover:text-indigo-600 p-1 rounded transition-colors cursor-pointer" title="Attach document link">
+              <button data-action="quick-attach" data-id="${escapeHtml(task.id)}" class="text-slate-300 hover:text-indigo-600 p-1 rounded transition-colors cursor-pointer" title="Attach document link">
                 <i data-lucide="paperclip" class="w-3.5 h-3.5"></i>
               </button>
             `}
           </td>
           <td class="py-2.5 px-1 text-center">
-            <input type="checkbox" data-action="toggle-verify" data-id="${task.id}" class="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 border-slate-300 cursor-pointer" ${task.verified ? 'checked' : ''} title="Check off during Thursday team review">
+            <input type="checkbox" data-action="toggle-verify" data-id="${escapeHtml(task.id)}" class="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 border-slate-300 cursor-pointer" ${task.verified ? 'checked' : ''} title="Check off during Thursday team review">
           </td>
           <td class="py-2.5 px-1 text-center">
             <div class="flex items-center justify-center gap-1">
-              <button data-action="edit-task" data-id="${task.id}" class="text-slate-400 hover:text-indigo-600 p-1 rounded transition-colors cursor-pointer" title="Edit Task">
+              <button data-action="edit-task" data-id="${escapeHtml(task.id)}" class="text-slate-400 hover:text-indigo-600 p-1 rounded transition-colors cursor-pointer" title="Edit Task">
                 <i data-lucide="edit-2" class="w-3.5 h-3.5"></i>
               </button>
-              <button data-action="delete-task" data-id="${task.id}" class="text-slate-400 hover:text-rose-600 p-1 rounded transition-colors cursor-pointer" title="Delete Task">
+              <button data-action="delete-task" data-id="${escapeHtml(task.id)}" class="text-slate-400 hover:text-rose-600 p-1 rounded transition-colors cursor-pointer" title="Delete Task">
                 <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
               </button>
             </div>
@@ -1669,7 +1628,7 @@ Christos (Content): On Maigaard, I've finished the weekly analytics report and a
       lines.forEach(line => {
         let matchedProject = null;
         for (const p of AppState.projects) {
-          const reg = new RegExp(`\\b${p}\\b`, 'i');
+          const reg = new RegExp(escapeRegex(p), 'i');
           if (reg.test(line)) {
             matchedProject = p;
             break;
@@ -1679,7 +1638,7 @@ Christos (Content): On Maigaard, I've finished the weekly analytics report and a
         let matchedSpecialist = null;
         for (const s of AppState.specialists) {
           const firstName = s.split(' ')[0];
-          const reg = new RegExp(`\\b${firstName}\\b`, 'i');
+          const reg = new RegExp(escapeRegex(firstName), 'i');
           if (reg.test(line)) {
             matchedSpecialist = s;
             break;
@@ -1848,7 +1807,7 @@ Christos (Content): On Maigaard, I've finished the weekly analytics report and a
       AppState.projects.forEach(p => {
         const badge = document.createElement('span');
         badge.className = 'inline-flex items-center gap-1 px-2 py-0.5 rounded bg-white border border-slate-200 text-xs font-semibold text-slate-800';
-        badge.innerHTML = `<span>${p}</span><button data-remove-project="${p}" class="text-slate-400 hover:text-rose-600 cursor-pointer">&times;</button>`;
+        badge.innerHTML = `<span>${escapeHtml(p)}</span><button data-remove-project="${escapeHtml(p)}" class="text-slate-400 hover:text-rose-600 cursor-pointer">&times;</button>`;
         pList.appendChild(badge);
       });
 
@@ -1857,7 +1816,7 @@ Christos (Content): On Maigaard, I've finished the weekly analytics report and a
       AppState.specialists.forEach(s => {
         const badge = document.createElement('span');
         badge.className = 'inline-flex items-center gap-1 px-2 py-0.5 rounded bg-white border border-slate-200 text-xs font-semibold text-slate-800';
-        badge.innerHTML = `<span>${s}</span><button data-remove-specialist="${s}" class="text-slate-400 hover:text-rose-600 cursor-pointer">&times;</button>`;
+        badge.innerHTML = `<span>${escapeHtml(s)}</span><button data-remove-specialist="${escapeHtml(s)}" class="text-slate-400 hover:text-rose-600 cursor-pointer">&times;</button>`;
         sList.appendChild(badge);
       });
     }
@@ -1932,131 +1891,288 @@ Christos (Content): On Maigaard, I've finished the weekly analytics report and a
       }
     });
 
-    document.getElementById('resetDemoBtn').addEventListener('click', async () => {
+    // Database-only persistence. Browser storage is read solely for explicit migration.
+    let committedTasks = [];
+    let committedSettings = null;
+    let subscriptions = [];
+    let sessionVersion = 0;
+    let activeWrites = 0;
+    let tasksReady = false;
+    let settingsReady = false;
+    let listenerFailed = false;
+
+    function tasksCol() { return collection(AppState.db, 'artifacts', TRACKER_APP_ID, 'public', 'data', 'tasks'); }
+    function taskRef(id) { return doc(tasksCol(), id); }
+    function configRef() { return doc(AppState.db, 'artifacts', TRACKER_APP_ID, 'public', 'data', 'config', 'settings'); }
+    function settingsData() {
+      return { projects: [...AppState.projects], specialists: [...AppState.specialists], availableWeeks: [...AppState.availableWeeks] };
+    }
+    function escapeRegex(value) { return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
+    function safeLink(value) {
+      try { const u = new URL(String(value)); return ['https:', 'http:'].includes(u.protocol) ? u.href : ''; }
+      catch { return ''; }
+    }
+    function validateTask(t) {
+      if (!t.id || t.id.includes('/') || t.id === '.' || t.id === '..' || /^__.*__$/.test(t.id) || new TextEncoder().encode(t.id).length > 1500) throw new Error('Invalid task ID.');
+      const validDate = v => /^\d{4}-\d{2}-\d{2}$/.test(v) && !Number.isNaN(Date.parse(v)) && new Date(v).toISOString().slice(0,10) === v;
+      if (!validDate(t.weekOf) || (t.deadline && !validDate(t.deadline))) throw new Error('Enter valid task dates.');
+      if (!['Low','Medium','High','Critical'].includes(t.priority)) throw new Error('Invalid priority.');
+      if (!['Planning','In Progress','Blocked','Ready for Client','Closed'].includes(t.status)) throw new Error('Invalid status.');
+      if (t.attachment && !safeLink(t.attachment)) throw new Error('Attachment links must start with https:// or http://.');
+      if (new TextEncoder().encode(JSON.stringify(t)).length > 100000) throw new Error('This task is too large. Shorten its text.');
+    }
+    function displayError(err) {
+      const code = String(err?.code || '');
+      if (code.includes('permission-denied')) return 'Access denied. Add this account’s UID to Firestore Rules and click Publish, then reload.';
+      if (code.includes('invalid-credential') || code.includes('wrong-password') || code.includes('user-not-found')) return 'Incorrect email or tracker password.';
+      if (code.includes('operation-not-allowed')) return 'Enable Email/Password in Firebase Authentication → Sign-in method.';
+      if (code.includes('invalid-api-key') || code.includes('configuration-not-found')) return 'Check the Firebase configuration at the top of index.html.';
+      if (code.includes('network') || code.includes('unavailable')) return 'Cannot reach Firebase. Check your internet connection and reload.';
+      if (code.includes('too-many-requests')) return 'Too many sign-in attempts. Try again later.';
+      return err?.message || 'The operation failed. Please try again.';
+    }
+    function connectionState() {
+      AppState.isCloudConnected = !!AppState.currentUser && tasksReady && settingsReady && navigator.onLine && !listenerFailed;
+      const ready = AppState.isCloudConnected;
+      if (ready) document.getElementById('loginPanel').classList.add('hidden');
+      const text = ready ? (activeWrites ? 'Saving…' : 'Cloud synced') : (AppState.currentUser ? 'Database unavailable' : 'Sign in required');
+      document.getElementById('syncText').textContent = text;
+      document.getElementById('syncBadge').className = 'text-[10px] px-2 py-0.5 rounded-full font-medium border flex items-center gap-1 ' + (ready && !activeWrites ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-amber-50 text-amber-800 border-amber-200');
+      const notice = document.getElementById('connectionNotice');
+      notice.classList.toggle('hidden', ready || !AppState.currentUser);
+      if (!ready && AppState.currentUser) notice.textContent = listenerFailed ? 'Database access failed. Check Firebase Rules, then reload.' : 'Waiting for the database. Changes are disabled until the connection returns.';
+      document.querySelector('main').inert = !ready || activeWrites > 0;
+      // During database operations, block all editable controls and double submission.
+      const ids = ['openAddModalBtn','openParseBtn','openManageModalBtn','databaseToolsBtn','exportCsvBtn','copySheetsBtn'];
+      for (const id of ids) document.getElementById(id).disabled = !ready || activeWrites > 0;
+      for (const id of ['taskModal','manageModal','parseModal','databaseModal']) document.getElementById(id).inert = !ready || activeWrites > 0;
+      document.getElementById('signOutBtn').disabled = activeWrites > 0;
+    }
+    function requireDatabase() {
+      if (!AppState.isCloudConnected || !AppState.currentUser) throw new Error('Wait until the tracker says “Cloud synced” before making changes.');
+    }
+    function restoreCommitted() {
+      AppState.tasks = structuredClone(committedTasks);
+      if (committedSettings) {
+        AppState.projects = [...committedSettings.projects];
+        AppState.specialists = [...committedSettings.specialists];
+        AppState.availableWeeks = [...new Set([...committedSettings.availableWeeks, ...AppState.tasks.map(t => t.weekOf)])].sort().reverse();
+      }
+      AppState.selectedTaskIds = new Set([...AppState.selectedTaskIds].filter(id => AppState.tasks.some(t => t.id === id)));
+      populateDropdowns(); renderTasks(); renderManageLists();
+    }
+    async function databaseWrite(operation) {
+      requireDatabase();
+      activeWrites++; connectionState();
       try {
-        localStorage.removeItem('wpt_saved_tasks_v4');
-        localStorage.removeItem('wpt_saved_weeks_v4');
-        localStorage.removeItem('wpt_saved_projects_v4');
-        localStorage.removeItem('wpt_saved_specialists_v4');
-      } catch (e) {}
-
-      AppState.projects = [...INITIAL_PROJECTS];
-      AppState.specialists = [...INITIAL_SPECIALISTS];
-      AppState.tasks = INITIAL_TASKS.map(sanitizeTask);
-      AppState.availableWeeks = ["2026-09-28"];
-      AppState.currentWeek = "2026-09-28";
-      await AppState.saveSettings();
-      for (const t of AppState.tasks) {
-        await AppState.saveTask(t);
-      }
-      populateDropdowns();
-      renderManageLists();
-      renderTasks();
-      showToast('Reset to default tracker template', 'info');
-      document.getElementById('manageModal').classList.add('hidden');
-    });
-
-    // Cloud Database Initialization with Graceful Local Fallback
-    async function initCloudSync() {
-      const syncBadge = document.getElementById('syncBadge');
-      const syncText = document.getElementById('syncText');
-
-        return;
-      }
-
-     try {
-  const app = initializeApp(firebaseConfig);
-
-  AppState.db = getFirestore(app);
-  AppState.auth = getAuth(app);
-
-  const userCredential = await signInAnonymously(AppState.auth);
-
-  const user = userCredential.user;
-
-  if (!user) {
-    throw new Error("Firebase authentication failed");
-  }
-
-  AppState.currentUser = user;
-  AppState.isCloudConnected = true;
-
-  if (syncBadge && syncText) {
-    syncText.textContent = "Cloud Synced";
-    syncBadge.className =
-      "text-[10px] px-2 py-0.5 rounded-full font-medium " +
-      "bg-emerald-50 text-emerald-700 border border-emerald-200 " +
-      "flex items-center gap-1";
-  }
-        }
-
-        AppState.currentUser = user;
-        AppState.isCloudConnected = true;
-
-        if (syncBadge && syncText) {
-          syncText.textContent = "Cloud Synced";
-          syncBadge.className = "text-[10px] px-2 py-0.5 rounded-full font-medium bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1";
-        }
-
-        // Live Tasks Listener (Strict path: /artifacts/{appId}/public/data/tasks)
-        const tasksCol = collection(AppState.db, 'artifacts', AppState.appId, 'public', 'data', 'tasks');
-        onSnapshot(tasksCol, (snapshot) => {
-          if (!snapshot.empty) {
-            const cloudTasks = [];
-            snapshot.forEach(docSnap => {
-              cloudTasks.push(sanitizeTask({ id: docSnap.id, ...docSnap.data() }));
-            });
-            AppState.tasks = cloudTasks;
-            const weekSet = new Set(AppState.availableWeeks);
-            cloudTasks.forEach(t => { if (t.weekOf) weekSet.add(t.weekOf); });
-            AppState.availableWeeks = Array.from(weekSet).sort().reverse();
-            AppState.persistLocalBackup();
-            populateDropdowns();
-            renderTasks();
-          } else {
-            // Seed initial tasks if empty in cloud
-            AppState.tasks.forEach(t => AppState.saveTask(t));
-AppState.saveSettings();
-          }
-        }, (err) => {
-          console.warn("Tasks cloud sync listener warning:", err);
+        await runTransaction(AppState.db, async tx => {
+          const config = await tx.get(configRef());
+          if (!config.exists()) throw new Error('Database settings are missing. Reload the tracker.');
+          await operation(tx, config.data());
+          tx.set(configRef(), { revision: (config.data().revision || 0) + 1 }, { merge: true });
         });
-
-        // Live Config Listener (Strict path: /artifacts/{appId}/public/data/config)
-        const configCol = collection(AppState.db, 'artifacts', AppState.appId, 'public', 'data', 'config');
-        onSnapshot(configCol, (snapshot) => {
-          snapshot.forEach(docSnap => {
-            if (docSnap.id === 'settings') {
-              const data = docSnap.data();
-              if (Array.isArray(data.projects) && data.projects.length) AppState.projects = data.projects;
-              if (Array.isArray(data.specialists) && data.specialists.length) AppState.specialists = data.specialists;
-              if (Array.isArray(data.availableWeeks) && data.availableWeeks.length) AppState.availableWeeks = data.availableWeeks;
-              AppState.persistLocalBackup();
-              populateDropdowns();
-              renderTasks();
-            }
-          });
-        }, (err) => {
-          console.warn("Config sync warning:", err);
-        });
-
       } catch (err) {
-        console.warn("Cloud connection fallback to local mode:", err);
-        if (syncBadge && syncText) {
-          syncText.textContent = "Saved Locally";
-          syncBadge.className = "text-[10px] px-2 py-0.5 rounded-full font-medium bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1";
-        }
+        restoreCommitted();
+        throw err;
+      } finally {
+        activeWrites--; connectionState();
       }
     }
+    function saveJSON(data, filename) {
+      const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }));
+      const link = document.createElement('a'); link.href = url; link.download = filename; link.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    }
+    function readLegacyData() {
+      const raw = localStorage.getItem('wpt_saved_tasks_v4');
+      if (raw === null) throw new Error('No old data at this browser address. Export a JSON backup from your old tracker and import that file here. See SETUP.md.');
+      return {
+        tasks: JSON.parse(raw),
+        projects: JSON.parse(localStorage.getItem('wpt_saved_projects_v4') || JSON.stringify(INITIAL_PROJECTS)),
+        specialists: JSON.parse(localStorage.getItem('wpt_saved_specialists_v4') || JSON.stringify(INITIAL_SPECIALISTS)),
+        availableWeeks: JSON.parse(localStorage.getItem('wpt_saved_weeks_v4') || '["2026-09-28"]')
+      };
+    }
+    function validateBackup(raw) {
+      if (!raw || !Array.isArray(raw.tasks)) throw new Error('Choose a full tracker JSON backup, not a CSV.');
+      // Conservative cap: tasks plus settings are written in one atomic operation.
+      if (raw.tasks.length > 400) throw new Error('This importer supports up to 400 tasks per backup. No data has been changed.');
+      if (raw.tasks.some(t => !t || typeof t !== 'object' || !t.id || !t.weekOf || !t.project || !t.specialist)) throw new Error('The backup contains an incomplete task.');
+      const tasks = raw.tasks.map(sanitizeTask);
+      tasks.forEach(validateTask);
+      if (new Set(tasks.map(t => t.id)).size !== tasks.length) throw new Error('The backup contains duplicate task IDs.');
+      const list = (key, fallback) => {
+        const values = raw[key] === undefined ? fallback : raw[key];
+        if (!Array.isArray(values) || !values.length || values.some(v => typeof v !== 'string' || !v.trim() || v.length > 200)) throw new Error(`Invalid ${key} list in the backup.`);
+        return [...new Set(values)];
+      };
+      const settings = {
+        projects: [...new Set([...list('projects', INITIAL_PROJECTS), ...tasks.map(t => t.project)])],
+        specialists: [...new Set([...list('specialists', INITIAL_SPECIALISTS), ...tasks.map(t => t.specialist)])],
+        availableWeeks: [...new Set([...list('availableWeeks', [mondayToday()]), ...tasks.map(t => t.weekOf)])].sort().reverse()
+      };
+      if (settings.availableWeeks.some(v => !/^\d{4}-\d{2}-\d{2}$/.test(v) || Number.isNaN(Date.parse(v)) || new Date(v).toISOString().slice(0,10) !== v)) throw new Error('Invalid week in the backup.');
+      if (new TextEncoder().encode(JSON.stringify({tasks, settings})).length > 6000000) throw new Error('The backup is too large for this importer. No data has been changed.');
+      return { tasks, settings };
+    }
+    async function stableDatabaseSnapshot() {
+      // All writes through this app increase revision, so import/reset detect races.
+      const before = await getDocFromServer(configRef());
+      const taskSnapshot = await getDocsFromServer(tasksCol());
+      return { revision: before.data()?.revision || 0, taskSnapshot, config: before.data() || {} };
+    }
+    async function importBackup(raw) {
+      requireDatabase();
+      const data = validateBackup(raw);
+      const existing = await stableDatabaseSnapshot();
+      if (!existing.taskSnapshot.empty || existing.config.importedAt || existing.config.resetAt) throw new Error('Import is for a fresh database only. Existing database tasks have not been changed.');
+      if (!confirm(`Import ${data.tasks.length} tasks, ${data.settings.projects.length} projects and ${data.settings.specialists.length} specialists into this shared database? Your old browser data will stay untouched.`)) return;
+      await databaseWrite(async (tx, current) => {
+        if ((current.revision || 0) !== existing.revision || current.importedAt || current.resetAt) throw new Error('The database changed while importing. Reload and try again.');
+        for (const task of data.tasks) tx.set(taskRef(task.id), task);
+        tx.set(configRef(), { ...data.settings, importedAt: new Date().toISOString(), importedBy: AppState.currentUser.uid }, { merge: true });
+      });
+      showToast(`Imported ${data.tasks.length} tasks into Firestore.`, 'success');
+      document.getElementById('databaseModal').classList.add('hidden');
+    }
+    document.getElementById('databaseToolsBtn').addEventListener('click', () => document.getElementById('databaseModal').classList.remove('hidden'));
+    document.getElementById('closeDatabaseModalBtn').addEventListener('click', () => document.getElementById('databaseModal').classList.add('hidden'));
+    document.getElementById('importLocalBtn').addEventListener('click', async () => {
+      const raw = readLegacyData();
+      // Download a backup before the database is changed.
+      saveJSON({ format: 'weekly-project-tracker-v1', ...raw }, 'tracker-before-migration.json');
+      await importBackup(raw);
+    });
+    document.getElementById('importBackupFile').addEventListener('change', async e => {
+      const file = e.target.files[0]; e.target.value = '';
+      if (!file) return;
+      if (file.size > 7000000) throw new Error('Choose a JSON backup smaller than 7 MB.');
+      await importBackup(JSON.parse(await file.text()));
+    });
+    document.getElementById('exportBackupBtn').addEventListener('click', async () => {
+      requireDatabase();
+      const before = await stableDatabaseSnapshot();
+      const after = await getDocFromServer(configRef());
+      if ((after.data()?.revision || 0) !== before.revision) throw new Error('Data changed during export. Please try exporting again.');
+      const { projects, specialists, availableWeeks } = before.config;
+      saveJSON({ format: 'weekly-project-tracker-v1', exportedAt: new Date().toISOString(), tasks: before.taskSnapshot.docs.map(d => sanitizeTask({ ...d.data(), id: d.id })), projects, specialists, availableWeeks }, 'tracker-backup.json');
+      showToast('Full database backup downloaded.', 'success');
+    });
+    document.getElementById('resetDemoBtn').addEventListener('click', async () => {
+      requireDatabase();
+      if (!confirm('Replace ALL shared database tasks and settings with the original example data? Download a full JSON backup first. This affects everyone using the tracker.')) return;
+      const existing = await stableDatabaseSnapshot();
+      const defaults = INITIAL_TASKS.map(sanitizeTask);
+      if (existing.taskSnapshot.size + defaults.length + 1 > 450) throw new Error('Too many tasks for an atomic browser reset. No data has been changed.');
+      await databaseWrite(async (tx, current) => {
+        if ((current.revision || 0) !== existing.revision) throw new Error('Another user changed the database. Please try resetting again.');
+        const defaultIds = new Set(defaults.map(t => t.id));
+        for (const d of existing.taskSnapshot.docs) if (!defaultIds.has(d.id)) tx.delete(d.ref);
+        for (const task of defaults) tx.set(taskRef(task.id), task);
+        tx.set(configRef(), { projects: [...INITIAL_PROJECTS], specialists: [...INITIAL_SPECIALISTS], availableWeeks: ['2026-09-28'], resetAt: new Date().toISOString(), resetBy: AppState.currentUser.uid }, { merge: true });
+      });
+      AppState.currentWeek = '2026-09-28';
+      AppState.selectedTaskIds.clear();
+      document.getElementById('manageModal').classList.add('hidden');
+      showToast('Shared database reset to the original example data.', 'success');
+    });
 
-    // App Bootstrapper
+    function stopSubscriptions() {
+      subscriptions.forEach(unsubscribe => unsubscribe()); subscriptions = [];
+      tasksReady = false; settingsReady = false; listenerFailed = false;
+    }
+    function listenerError(err, version) {
+      if (version !== sessionVersion) return;
+      listenerFailed = true; connectionState();
+      showToast(displayError(err), 'error');
+    }
+    async function openDatabase(user, version) {
+      document.getElementById('loginMessage').textContent = 'Opening the database…';
+      try {
+        // Initialize settings once, without adding example tasks or reading browser data.
+        await runTransaction(AppState.db, async tx => {
+          const current = await tx.get(configRef());
+          if (!current.exists()) tx.set(configRef(), { projects: [...INITIAL_PROJECTS], specialists: [...INITIAL_SPECIALISTS], availableWeeks: [mondayToday()], revision: 0 });
+        });
+        if (version !== sessionVersion) return;
+        subscriptions.push(onSnapshot(tasksCol(), { includeMetadataChanges: true }, snapshot => {
+          if (version !== sessionVersion) return;
+          tasksReady = !snapshot.metadata.fromCache;
+          if (!snapshot.metadata.hasPendingWrites) {
+            committedTasks = snapshot.docs.map(d => sanitizeTask({ ...d.data(), id: d.id }));
+            committedTasks.sort((a,b) => b.weekOf.localeCompare(a.weekOf) || a.id.localeCompare(b.id));
+            restoreCommitted(); // An empty collection remains empty, including after last deletion.
+          }
+          connectionState();
+        }, err => listenerError(err, version)));
+        subscriptions.push(onSnapshot(configRef(), { includeMetadataChanges: true }, snapshot => {
+          if (version !== sessionVersion) return;
+          settingsReady = snapshot.exists() && !snapshot.metadata.fromCache;
+          if (snapshot.exists() && !snapshot.metadata.hasPendingWrites) {
+            const data = snapshot.data();
+            committedSettings = { projects: data.projects || [...INITIAL_PROJECTS], specialists: data.specialists || [...INITIAL_SPECIALISTS], availableWeeks: data.availableWeeks || [mondayToday()] };
+            restoreCommitted();
+          }
+          if (tasksReady && settingsReady) document.getElementById('loginPanel').classList.add('hidden');
+          connectionState();
+        }, err => listenerError(err, version)));
+      } catch (err) {
+        if (version !== sessionVersion) return;
+        listenerFailed = true;
+        document.getElementById('loginMessage').textContent = displayError(err);
+        connectionState();
+      }
+    }
+    async function initCloudSync() {
+      const message = document.getElementById('loginMessage');
+      if (location.protocol === 'file:') { message.textContent = 'Open this tracker through http://localhost:5500/index.html. See step 7 in SETUP.md.'; return; }
+      if (['apiKey','authDomain','projectId','appId'].some(key => !firebaseConfig[key] || firebaseConfig[key].startsWith('PASTE_'))) { message.textContent = 'Paste your Firebase web app configuration at the top of index.html, save the file and refresh. See SETUP.md.'; return; }
+      try {
+        const app = initializeApp(firebaseConfig);
+        AppState.db = getFirestore(app); // Default in-memory cache; tracker records are not saved to localStorage.
+        AppState.auth = getAuth(app);
+        await setPersistence(AppState.auth, browserSessionPersistence);
+        document.getElementById('loginBtn').disabled = false;
+        onAuthStateChanged(AppState.auth, user => {
+          const version = ++sessionVersion;
+          stopSubscriptions();
+          AppState.currentUser = user;
+          committedTasks = []; committedSettings = null; AppState.tasks = [];
+          AppState.projects = [...INITIAL_PROJECTS]; AppState.specialists = [...INITIAL_SPECIALISTS]; AppState.availableWeeks = [mondayToday()];
+          AppState.selectedTaskIds.clear();
+          for (const id of ['taskModal','manageModal','parseModal','databaseModal']) document.getElementById(id).classList.add('hidden');
+          document.getElementById('taskForm').reset();
+          document.getElementById('transcriptInput').value = '';
+          document.getElementById('signedInEmail').textContent = user?.email || '';
+          document.getElementById('signOutBtn').classList.toggle('hidden', !user);
+          document.getElementById('loginSignOutBtn').classList.toggle('hidden', !user);
+          document.getElementById('loginPanel').classList.remove('hidden');
+          restoreCommitted(); connectionState();
+          if (user) openDatabase(user, version);
+          else message.textContent = 'Enter the email and password created in Firebase Authentication → Users.';
+        });
+      } catch (err) { message.textContent = displayError(err); }
+    }
+    document.getElementById('loginForm').addEventListener('submit', async e => {
+      e.preventDefault();
+      const button = document.getElementById('loginBtn'); button.disabled = true;
+      try {
+        document.getElementById('loginMessage').textContent = 'Signing in…';
+        await signInWithEmailAndPassword(AppState.auth, document.getElementById('loginEmail').value.trim(), document.getElementById('loginPassword').value);
+        document.getElementById('loginPassword').value = '';
+      } catch (err) { document.getElementById('loginMessage').textContent = displayError(err); }
+      finally { button.disabled = false; }
+    });
+    for (const id of ['signOutBtn','loginSignOutBtn']) document.getElementById(id).addEventListener('click', async () => { await signOut(AppState.auth); });
+    window.addEventListener('offline', connectionState);
+    window.addEventListener('online', connectionState);
+    window.addEventListener('unhandledrejection', e => {
+      e.preventDefault(); console.error(e.reason); showToast(displayError(e.reason), 'error');
+      if (!activeWrites) restoreCommitted();
+    });
+
     function startApp() {
-      AppState.loadLocalBackup();
-      populateDropdowns();
-      setupEventListeners();
-      renderTasks();
-      refreshIcons();
-      initCloudSync();
+      populateDropdowns(); setupEventListeners(); renderTasks(); refreshIcons(); connectionState(); initCloudSync();
     }
 
     if (document.readyState === 'loading') {
