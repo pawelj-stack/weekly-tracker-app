@@ -1,0 +1,2041 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-slate-50">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Weekly Project Tracker & AI Parser</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/lucide@0.344.0/dist/umd/lucide.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          },
+          colors: {
+            brand: {
+              50: '#eef2ff',
+              100: '#e0e7ff',
+              500: '#6366f1',
+              600: '#4f46e5',
+              700: '#4338ca',
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    /* Custom Scrollbar */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #f1f5f9;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 9999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #94a3b8;
+    }
+
+    /* Modal Backdrop */
+    .modal-backdrop {
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+    }
+
+    /* Dropdown Styling */
+    select.clean-select {
+      background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+      background-position: right 0.4rem center;
+      background-repeat: no-repeat;
+      background-size: 0.8em;
+      padding-right: 1.4rem;
+      appearance: none;
+      -webkit-appearance: none;
+    }
+
+    /* Status badge glow highlights */
+    .status-blocked {
+      background: #fff1f2;
+      color: #be123c;
+      border: 1px solid #fecdd3;
+      box-shadow: 0 0 0 1px rgba(244, 63, 94, 0.1);
+    }
+    .status-planning {
+      background: #fffbeb;
+      color: #b45309;
+      border: 1px solid #fde68a;
+    }
+    .status-in-progress {
+      background: #eff6ff;
+      color: #1d4ed8;
+      border: 1px solid #bfdbfe;
+    }
+    .status-ready {
+      background: #faf5ff;
+      color: #7e22ce;
+      border: 1px solid #e9d5ff;
+    }
+    .status-closed {
+      background: #ecfdf5;
+      color: #047857;
+      border: 1px solid #a7f3d0;
+    }
+
+    /* Strikethrough style */
+    .task-closed-text {
+      text-decoration: line-through;
+      color: #94a3b8 !important;
+    }
+  </style>
+</head>
+<body class="h-full flex flex-col font-sans text-slate-800 antialiased overflow-x-hidden">
+
+  <!-- Header -->
+  <header class="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-xs">
+    <div class="w-full px-4 sm:px-6 py-2.5 flex flex-wrap items-center justify-between gap-3">
+      <!-- Branding & Title -->
+      <div class="flex items-center gap-3">
+        <div class="w-8 h-8 rounded-xl bg-gradient-to-tr from-indigo-600 to-indigo-500 text-white flex items-center justify-center shadow-md shadow-indigo-100 flex-shrink-0">
+          <i data-lucide="layers" class="w-4 h-4"></i>
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <h1 class="text-sm font-bold text-slate-900 tracking-tight leading-tight">Weekly Project Tracker</h1>
+            <span class="text-[10px] px-2 py-0.5 rounded-full font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200">
+              6 Clients &bull; 6 Specialists
+            </span>
+            <span id="syncBadge" class="text-[10px] px-2 py-0.5 rounded-full font-medium bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1">
+              <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+              <span id="syncText">Ready</span>
+            </span>
+          </div>
+          <p class="text-[11px] text-slate-500 hidden sm:block">Monday Status &bull; Priorities &amp; Blockers &bull; Thursday Verification</p>
+        </div>
+      </div>
+
+      <!-- Action Buttons -->
+      <div class="flex items-center flex-wrap gap-2">
+        <button id="openParseBtn" class="bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white text-xs font-semibold px-3 py-1.5 rounded-lg shadow-sm flex items-center gap-1.5 transition-all cursor-pointer">
+          <i data-lucide="sparkles" class="w-3.5 h-3.5"></i>
+          <span>Parse Transcript</span>
+        </button>
+
+        <button id="openAddModalBtn" class="bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer shadow-2xs">
+          <i data-lucide="plus" class="w-3.5 h-3.5 text-indigo-600"></i>
+          <span>Add Task</span>
+        </button>
+
+        <div class="h-4 w-px bg-slate-200 hidden sm:block"></div>
+
+        <button id="copySheetsBtn" class="bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 text-xs font-medium px-2.5 py-1.5 rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer" title="Copy filtered rows formatted directly for Google Sheets">
+          <i data-lucide="sheet" class="w-3.5 h-3.5 text-emerald-600"></i>
+          <span class="hidden md:inline">Copy for Sheets</span>
+        </button>
+
+        <button id="exportCsvBtn" class="bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 text-xs font-medium px-2.5 py-1.5 rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer" title="Export as CSV file">
+          <i data-lucide="download" class="w-3.5 h-3.5 text-slate-500"></i>
+          <span class="hidden md:inline">CSV</span>
+        </button>
+
+        <button id="openManageModalBtn" class="bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 text-xs font-medium p-1.5 rounded-lg transition-colors cursor-pointer" title="Manage Projects & Specialists">
+          <i data-lucide="settings" class="w-3.5 h-3.5 text-slate-600"></i>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main View -->
+  <main class="flex-1 w-full px-3 sm:px-6 py-3.5 flex flex-col gap-3">
+    <!-- Top Filter & Metric Controls -->
+    <div class="bg-white border border-slate-200/90 rounded-xl p-3 shadow-xs flex flex-wrap items-center justify-between gap-3">
+      <!-- Week Selector & Actions -->
+      <div class="flex items-center flex-wrap gap-2.5">
+        <div>
+          <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-0.5">Cycle Week</label>
+          <div class="flex items-center gap-1.5">
+            <select id="weekFilter" class="clean-select font-bold text-xs bg-slate-100 hover:bg-slate-200/80 px-2.5 py-1.5 rounded-lg border border-slate-200 cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-500">
+              <!-- Dynamically populated -->
+            </select>
+            <button id="addNewWeekBtn" class="text-xs bg-indigo-50 text-indigo-600 hover:bg-indigo-100 px-2.5 py-1.5 rounded-lg font-semibold transition-colors flex items-center gap-1 cursor-pointer" title="Create a new week cycle and carry forward uncompleted tasks">
+              <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+              <span>New Week</span>
+            </button>
+            <button id="rolloverTasksBtn" class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-2.5 py-1.5 rounded-lg font-medium transition-colors flex items-center gap-1 cursor-pointer" title="Manually roll over open tasks from previous week into current week">
+              <i data-lucide="arrow-right-circle" class="w-3.5 h-3.5 text-indigo-600"></i>
+              <span class="hidden sm:inline">Roll Over Open</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="h-8 w-px bg-slate-200 mx-1 hidden lg:block"></div>
+
+        <!-- Workflow Filters -->
+        <div>
+          <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-0.5">Workflow Mode</label>
+          <div class="inline-flex rounded-lg border border-slate-200 p-0.5 bg-slate-100">
+            <button id="filterAll" class="px-2.5 py-1 text-xs font-semibold rounded-md transition-all bg-white text-slate-800 shadow-2xs cursor-pointer">All Tasks</button>
+            <button id="filterMonday" class="px-2.5 py-1 text-xs font-medium rounded-md text-slate-600 hover:text-slate-900 transition-all flex items-center gap-1 cursor-pointer">
+              <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span> Monday Prep
+            </button>
+            <button id="filterThursday" class="px-2.5 py-1 text-xs font-medium rounded-md text-slate-600 hover:text-slate-900 transition-all flex items-center gap-1 cursor-pointer">
+              <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Thursday Verification
+            </button>
+            <button id="filterBlocked" class="px-2.5 py-1 text-xs font-medium rounded-md text-slate-600 hover:text-slate-900 transition-all flex items-center gap-1 cursor-pointer">
+              <span class="w-1.5 h-1.5 rounded-full bg-rose-500"></span> Blockers
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Quick Metrics Counters -->
+      <div class="flex items-center gap-2">
+        <div class="flex items-center gap-1.5 px-2.5 py-1 bg-slate-50 border border-slate-200 rounded-lg text-xs" title="Total tasks currently visible">
+          <span class="text-slate-500 font-medium">Visible:</span>
+          <span id="metricTotal" class="font-bold text-slate-800 font-mono">0</span>
+        </div>
+        <div class="flex items-center gap-1.5 px-2.5 py-1 bg-rose-50 border border-rose-200 rounded-lg text-xs" title="Currently blocked tasks">
+          <span class="text-rose-600 font-medium">Blocked:</span>
+          <span id="metricBlocked" class="font-bold text-rose-700 font-mono">0</span>
+        </div>
+        <div class="flex items-center gap-1.5 px-2.5 py-1 bg-emerald-50 border border-emerald-200 rounded-lg text-xs" title="Verified on Thursday call">
+          <span class="text-emerald-600 font-medium">Verified:</span>
+          <span id="metricVerified" class="font-bold text-emerald-700 font-mono">0%</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Filter Bar & Search -->
+    <div class="flex flex-wrap items-center justify-between gap-2 text-xs">
+      <div class="flex items-center flex-wrap gap-2 flex-1">
+        <!-- Search bar -->
+        <div class="relative w-full sm:w-64">
+          <i data-lucide="search" class="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2"></i>
+          <input type="text" id="searchInput" placeholder="Search task, project, note..." class="w-full pl-8 pr-3 py-1.5 bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-xs text-slate-800">
+        </div>
+
+        <!-- Project dropdown filter -->
+        <select id="projectFilter" class="clean-select bg-white border border-slate-200 px-2.5 py-1.5 rounded-lg text-slate-700 font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer">
+          <option value="ALL">All Projects (6)</option>
+        </select>
+
+        <!-- Specialist dropdown filter -->
+        <select id="specialistFilter" class="clean-select bg-white border border-slate-200 px-2.5 py-1.5 rounded-lg text-slate-700 font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer">
+          <option value="ALL">All Specialists (6)</option>
+        </select>
+
+        <!-- Status filter -->
+        <select id="statusFilter" class="clean-select bg-white border border-slate-200 px-2.5 py-1.5 rounded-lg text-slate-700 font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer">
+          <option value="ALL">All Statuses</option>
+          <option value="Planning">Planning</option>
+          <option value="In Progress">In Progress</option>
+          <option value="Blocked">Blocked</option>
+          <option value="Ready for Client">Ready for Client</option>
+          <option value="Closed">Closed</option>
+        </select>
+      </div>
+
+      <!-- Bulk Actions -->
+      <div id="bulkActionsContainer" class="hidden items-center gap-2">
+        <span id="selectedCountText" class="text-slate-500 font-medium text-xs">0 selected</span>
+        <button id="deleteSelectedBtn" class="bg-rose-50 text-rose-600 hover:bg-rose-100 border border-rose-200 px-2.5 py-1 rounded-lg font-semibold flex items-center gap-1 transition-colors cursor-pointer">
+          <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+          <span>Delete Selected</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Table Container (Spread across screen with zero horizontal scroll) -->
+    <div class="bg-white border border-slate-200 rounded-xl shadow-xs overflow-hidden flex-1 flex flex-col">
+      <div class="w-full overflow-hidden">
+        <table class="w-full table-fixed text-left text-xs border-collapse">
+          <thead>
+            <tr class="bg-slate-100/90 border-b border-slate-200 text-slate-600 text-[11px] font-bold uppercase tracking-wider select-none">
+              <th class="py-2.5 px-1.5 w-[3%] text-center">
+                <input type="checkbox" id="selectAllCheckbox" class="w-3.5 h-3.5 rounded text-indigo-600 focus:ring-indigo-500 border-slate-300 cursor-pointer">
+              </th>
+              <th class="py-2.5 px-1.5 w-[7%]">Week Of</th>
+              <th class="py-2.5 px-2 w-[9%]">Project</th>
+              <th class="py-2.5 px-2 w-[10%]">Specialist</th>
+              <th class="py-2.5 px-3 w-[23%]">Task Description</th>
+              <th class="py-2.5 px-1.5 w-[7%]">Priority</th>
+              <th class="py-2.5 px-1.5 w-[9%]">Status</th>
+              <th class="py-2.5 px-1.5 w-[8%]">Deadline</th>
+              <th class="py-2.5 px-2 w-[11%]">Blockers / Notes</th>
+              <th class="py-2.5 px-1.5 w-[5%] text-center">Attach</th>
+              <th class="py-2.5 px-1 w-[4%] text-center" title="Verified in Thursday team review">Thu</th>
+              <th class="py-2.5 px-1 w-[4%] text-center">Act</th>
+            </tr>
+          </thead>
+          <tbody id="taskTableBody" class="divide-y divide-slate-100 text-slate-700">
+            <!-- Dynamically populated rows -->
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Empty State -->
+      <div id="emptyState" class="hidden p-12 text-center flex-col items-center justify-center">
+        <div class="w-12 h-12 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center mb-3">
+          <i data-lucide="inbox" class="w-6 h-6"></i>
+        </div>
+        <p class="font-bold text-slate-800 text-sm">No tasks match your filter criteria</p>
+        <p class="text-xs text-slate-500 mt-1 max-w-sm">Try adjusting your filters or click "+ Add Task" or "Parse Transcript" to add tasks.</p>
+        <button id="resetFiltersBtn" class="mt-3 text-xs text-indigo-600 font-semibold hover:underline cursor-pointer">Reset All Filters</button>
+      </div>
+    </div>
+  </main>
+
+  <!-- Add / Edit Task Modal -->
+  <div id="taskModal" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4 bg-slate-900/50 modal-backdrop">
+    <div class="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-lg overflow-hidden flex flex-col">
+      <div class="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between bg-slate-50/60">
+        <h3 id="modalTitle" class="font-bold text-slate-900 text-sm flex items-center gap-2">
+          <i data-lucide="edit-3" class="w-4 h-4 text-indigo-600"></i>
+          <span>Add New Task</span>
+        </h3>
+        <button id="closeModalBtn" class="text-slate-400 hover:text-slate-700 p-1 rounded-lg cursor-pointer">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+
+      <form id="taskForm" class="p-5 flex flex-col gap-3 text-xs">
+        <input type="hidden" id="editTaskId">
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">Week Of</label>
+            <input type="date" id="modalWeekOf" required class="w-full bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono text-xs">
+          </div>
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">Project / Client</label>
+            <select id="modalProject" required class="clean-select w-full bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer">
+              <!-- Dynamically populated -->
+            </select>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">Specialist</label>
+            <select id="modalSpecialist" required class="clean-select w-full bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer">
+              <!-- Dynamically populated -->
+            </select>
+          </div>
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">Priority</label>
+            <select id="modalPriority" required class="clean-select w-full bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-medium cursor-pointer">
+              <option value="Low">Low</option>
+              <option value="Medium">Medium</option>
+              <option value="High">High</option>
+              <option value="Critical">Critical</option>
+            </select>
+          </div>
+        </div>
+
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1">Task Description</label>
+          <textarea id="modalDescription" rows="3" required placeholder="Clear description of action item or deliverable..." class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-xs resize-none"></textarea>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">Status</label>
+            <select id="modalStatus" required class="clean-select w-full bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-semibold cursor-pointer">
+              <option value="Planning">Planning</option>
+              <option value="In Progress">In Progress</option>
+              <option value="Blocked">Blocked</option>
+              <option value="Ready for Client">Ready for Client</option>
+              <option value="Closed">Closed</option>
+            </select>
+          </div>
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">Deadline</label>
+            <input type="date" id="modalDeadline" class="w-full bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono text-xs">
+          </div>
+        </div>
+
+        <div>
+          <div class="flex items-center gap-2 mt-1 mb-2">
+            <input type="checkbox" id="modalVerified" class="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 border-slate-300 cursor-pointer">
+            <label for="modalVerified" class="text-slate-600 font-semibold cursor-pointer">Thursday Verification (verified with team)</label>
+          </div>
+        </div>
+
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1">Blockers / Notes</label>
+          <input type="text" id="modalBlockers" placeholder="Specific obstacles, dependencies or leave 'None'" class="w-full bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-xs">
+        </div>
+
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1 flex items-center gap-1.5">
+            <i data-lucide="paperclip" class="w-3.5 h-3.5 text-indigo-600"></i>
+            <span>Attachment / Document Link</span>
+          </label>
+          <input type="text" id="modalAttachment" placeholder="Paste link (Google Docs, Sheets, Drive, Figma, Loom...)" class="w-full bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-xs font-mono">
+        </div>
+
+        <div class="pt-2.5 border-t border-slate-100 flex items-center justify-between">
+          <button type="button" id="modalDeleteBtn" class="hidden text-rose-600 hover:text-rose-800 font-semibold text-xs flex items-center gap-1 cursor-pointer">
+            <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+            <span>Delete Task</span>
+          </button>
+          <div class="flex items-center gap-2 ml-auto">
+            <button type="button" id="cancelModalBtn" class="px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 font-medium cursor-pointer">Cancel</button>
+            <button type="submit" class="px-4 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-semibold shadow-xs cursor-pointer">Save Task</button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Transcript Parser Modal -->
+  <div id="parseModal" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4 bg-slate-900/50 modal-backdrop">
+    <div class="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-xl overflow-hidden flex flex-col">
+      <div class="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between bg-slate-50/60">
+        <div class="flex items-center gap-2">
+          <div class="w-6 h-6 rounded-lg bg-indigo-100 text-indigo-700 flex items-center justify-center">
+            <i data-lucide="bot" class="w-3.5 h-3.5"></i>
+          </div>
+          <div>
+            <h3 class="font-bold text-slate-900 text-sm leading-tight">Monday Call Transcript Parser</h3>
+            <p class="text-[10px] text-slate-500 leading-tight">Extracts tasks, owners, priority, blockers &amp; status directly into tracker</p>
+          </div>
+        </div>
+        <button id="closeParseModalBtn" class="text-slate-400 hover:text-slate-700 p-1 rounded-lg cursor-pointer">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+
+      <div class="p-5 flex flex-col gap-3 text-xs">
+        <div class="flex items-center justify-between">
+          <label class="font-semibold text-slate-700">Paste Meeting Call Notes or Transcript:</label>
+          <button id="loadSampleTranscriptBtn" class="text-indigo-600 hover:text-indigo-800 font-semibold text-[11px] underline cursor-pointer">
+            Load Sample Transcript
+          </button>
+        </div>
+
+        <textarea id="transcriptInput" rows="7" placeholder="Paste your raw Monday call transcript or speaker notes here..." class="w-full bg-slate-50 border border-slate-200 rounded-lg p-3 font-mono text-[11px] focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"></textarea>
+
+        <div class="grid grid-cols-2 gap-3 items-center bg-slate-50 p-2.5 rounded-lg border border-slate-200">
+          <div>
+            <span class="text-[10px] uppercase font-bold text-slate-500 block mb-0.5">Assign To Week:</span>
+            <input type="date" id="parseTargetWeek" class="w-full bg-white border border-slate-200 rounded px-2 py-1 font-mono text-xs text-slate-800">
+          </div>
+          <div class="text-[11px] text-slate-500 leading-tight">
+            Recognizes all 6 clients &amp; 6 specialists, parses priorities, statuses, and extracts blockers automatically.
+          </div>
+        </div>
+
+        <div class="pt-2 border-t border-slate-100 flex items-center justify-end gap-2">
+          <button type="button" id="cancelParseBtn" class="px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 font-medium cursor-pointer">Cancel</button>
+          <button type="button" id="executeParseBtn" class="px-4 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-semibold shadow-xs flex items-center gap-1.5 cursor-pointer">
+            <i data-lucide="sparkles" class="w-3.5 h-3.5"></i>
+            <span>Parse &amp; Import</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Manage Clients & Specialists Modal -->
+  <div id="manageModal" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4 bg-slate-900/50 modal-backdrop">
+    <div class="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-lg overflow-hidden flex flex-col">
+      <div class="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between bg-slate-50/60">
+        <h3 class="font-bold text-slate-900 text-sm flex items-center gap-2">
+          <i data-lucide="settings" class="w-4 h-4 text-indigo-600"></i>
+          <span>Manage Projects &amp; Specialists</span>
+        </h3>
+        <button id="closeManageModalBtn" class="text-slate-400 hover:text-slate-700 p-1 rounded-lg cursor-pointer">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+
+      <div class="p-5 flex flex-col gap-4 text-xs">
+        <!-- Projects Section -->
+        <div>
+          <label class="block font-bold text-slate-800 mb-1">Projects / Clients (6)</label>
+          <div class="flex gap-2 mb-2">
+            <input type="text" id="newProjectInput" placeholder="New project name..." class="flex-1 bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            <button id="addProjectBtn" class="bg-slate-800 hover:bg-slate-900 text-white font-semibold px-3 py-1.5 rounded-lg cursor-pointer">Add</button>
+          </div>
+          <div id="projectsList" class="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto p-1.5 bg-slate-50 rounded-lg border border-slate-200">
+            <!-- Dynamic tags -->
+          </div>
+        </div>
+
+        <!-- Specialists Section -->
+        <div>
+          <label class="block font-bold text-slate-800 mb-1">Specialists (6)</label>
+          <div class="flex gap-2 mb-2">
+            <input type="text" id="newSpecialistInput" placeholder="New specialist name..." class="flex-1 bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            <button id="addSpecialistBtn" class="bg-slate-800 hover:bg-slate-900 text-white font-semibold px-3 py-1.5 rounded-lg cursor-pointer">Add</button>
+          </div>
+          <div id="specialistsList" class="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto p-1.5 bg-slate-50 rounded-lg border border-slate-200">
+            <!-- Dynamic tags -->
+          </div>
+        </div>
+
+        <div class="pt-2 border-t border-slate-100 flex items-center justify-between">
+          <button id="resetDemoBtn" class="text-xs text-rose-600 hover:underline cursor-pointer">Reset to Default Data</button>
+          <button id="doneManageBtn" class="px-4 py-1.5 rounded-lg bg-indigo-600 text-white font-semibold cursor-pointer">Done</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification Container -->
+  <div id="toastContainer" class="fixed bottom-4 right-4 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+    import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+    import { getFirestore, doc, setDoc, deleteDoc, onSnapshot, collection } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+    const INITIAL_PROJECTS = ["SAXO", "Trener", "Translyft", "OnRobot", "Maigaard", "Exante"];
+    const INITIAL_SPECIALISTS = [
+      "Paweł (Project Manager)",
+      "Chiara (Team Manager)",
+      "Mateusz (On-site)",
+      "Klaudia (AI)",
+      "Darya (Off-site)",
+      "Christos (Content)"
+    ];
+
+    // Seed Data parsed from Team 1 Monday Sync (Week of Sept 28, 2026)
+    const INITIAL_TASKS = [
+      // ONROBOT
+      {
+        id: "TSK-001",
+        weekOf: "2026-09-28",
+        project: "OnRobot",
+        specialist: "Mateusz (On-site)",
+        description: "Send meta titles, descriptions & headings CSV to client for self-implementation. Inquire about CMS alt text capabilities (upload manually if needed) and re-crawl site for redirections/broken links.",
+        priority: "High",
+        status: "In Progress",
+        deadline: "2026-10-02",
+        blockers: "Waiting on client CMS capability confirmation for image alt text",
+        attachment: "",
+        verified: false,
+        rolledOverFrom: null
+      },
+      {
+        id: "TSK-002",
+        weekOf: "2026-09-28",
+        project: "OnRobot",
+        specialist: "Christos (Content)",
+        description: "Deliver final batch of content recommendations for the remaining 6 product pages by Wednesday.",
+        priority: "High",
+        status: "In Progress",
+        deadline: "2026-09-30",
+        blockers: "None",
+        attachment: "",
+        verified: false,
+        rolledOverFrom: null
+      },
+      {
+        id: "TSK-003",
+        weekOf: "2026-09-28",
+        project: "OnRobot",
+        specialist: "Paweł (Project Manager)",
+        description: "Attend Tuesday AI sync with client; propose transition from standalone on-site recommendations into direct educational content creation & dedicated content calendar.",
+        priority: "High",
+        status: "Planning",
+        deadline: "2026-09-29",
+        blockers: "Client has limited internal bandwidth (3 people in global marketing focused on paid campaigns)",
+        attachment: "",
+        verified: false,
+        rolledOverFrom: null
+      },
+      {
+        id: "TSK-004",
+        weekOf: "2026-09-28",
+        project: "OnRobot",
+        specialist: "Darya (Off-site)",
+        description: "September link building completed and report sent. Collaborate with Klaudia today on AI presentation document for Tuesday's call; prepare October entries and target selections.",
+        priority: "Medium",
+        status: "In Progress",
+        deadline: "2026-09-29",
+        blockers: "None",
+        attachment: "",
+        verified: false,
+        rolledOverFrom: null
+      },
+      {
+        id: "TSK-005",
+        weekOf: "2026-09-28",
+        project: "OnRobot",
+        specialist: "Klaudia (AI)",
+        description: "Prepare example AI project with source lists (showcasing Trener/Exante) for Tuesday call. Coordinate with Albina regarding feasibility and budget proposal for outreach campaign (initial ~2K proposal).",
+        priority: "High",
+        status: "In Progress",
+        deadline: "2026-09-29",
+        blockers: "None",
+        attachment: "",
+        verified: false,
+        rolledOverFrom: null
+      },
+      {
+        id: "TSK-006",
+        weekOf: "2026-09-28",
+        project: "OnRobot",
+        specialist: "Chiara (Team Manager)",
+        description: "Review plan to double off-site budget from 400 to 800 once Albina confirms outreach campaign details; open October task accordingly.",
+        priority: "Medium",
+        status: "Planning",
+        deadline: "2026-10-02",
+        blockers: "None",
+        attachment: "",
+        verified: false,
+        rolledOverFrom: null
+      },
+
+      // TRENER
+      {
+        id: "TSK-007",
+        weekOf: "2026-09-28",
+        project: "Trener",
+        specialist: "Mateusz (On-site)",
+        description: "Keywords added to Search Robot dashboard with search intents. Reformat competitor keyword spreadsheet by individual competitor so Vincent can select target keywords.",
+        priority: "High",
+        status: "In Progress",
+        deadline: "2026-10-01",
+        blockers: "Client slow in responding",
+        attachment: "",
+        verified: false,
+        rolledOverFrom: null
+      },
+      {
+        id: "TSK-008",
+        weekOf: "2026-09-28",
+        project: "Trener",
+        specialist: "Paweł (Project Manager)",
+        description: "Re-arrange and send competitor keywords file to Vincent; push for client feedback on deliveries ahead of next week's monthly call.",
+        priority: "Medium",
+        status: "In Progress",
+        deadline: "2026-10-02",
+        blockers: "Client slow in responding",
+        attachment: "",
+        verified: false,
+        rolledOverFrom: null
+      },
+      {
+        id: "TSK-009",
+        weekOf: "2026-09-28",
+        project: "Trener",
+        specialist: "Chiara (Team Manager)",
+        description: "Update October backlink task to $800 (doubling budget due to freeze on website changes) and retain AI citation task (€475).",
+        priority: "Medium",
+        status: "Planning",
+        deadline: "2026-10-02",
+        blockers: "None",
+        attachment: "",
+        verified: false,
+        rolledOverFrom: null
+      },
+      {
+        id: "TSK-010",
+        weekOf: "2026-09-28",
+        project: "Trener",
+        specialist: "Klaudia (AI)",
+        description: "Research topics for non-paid outreach articles aligned with client guidelines; evaluate review-based strategies to improve AI citation levels within budget.",
+        priority: "High",
+        status: "Blocked",
+        deadline: "2026-10-02",
+        blockers: "Vincent rejected all paid publication options; organic AI citation outreach without paid placement is difficult",
+        attachment: "",
+        verified: false,
+        rolledOverFrom: null
+      },
+
+      // TRANSLYFT
+      {
+        id: "TSK-011",
+        weekOf: "2026-09-28",
+        project: "Translyft",
+        specialist: "Mateusz (On-site)",
+        description: "Prepare comprehensive website structure recommendation spreadsheet to support site rebuild over the next couple of weeks.",
+        priority: "High",
+        status: "In Progress",
+        deadline: "2026-10-09",
+        blockers: "None",
+        attachment: "",
+        verified: false,
+        rolledOverFrom: null
+      },
+      {
+        id: "TSK-012",
+        weekOf: "2026-09-28",
+        project: "Translyft",
+        specialist: "Darya (Off-site)",
+        description: "Execute competitor backlink research and place orders on identified publisher websites within approved budget.",
+        priority: "Medium",
+        status: "In Progress",
+        deadline: "2026-10-02",
+        blockers: "None",
+        attachment: "",
+        verified: false,
+        rolledOverFrom: null
+      },
+
+      // MAIGAARD
+      {
+        id: "TSK-013",
+        weekOf: "2026-09-28",
+        project: "Maigaard",
+        specialist: "Christos (Content)",
+        description: "Finalize second blog article and proceed immediately with the trust article while waiting for answers on the third piece (target 2 articles/month).",
+        priority: "Medium",
+        status: "In Progress",
+        deadline: "2026-10-02",
+        blockers: "Awaiting client answers for third article (bypassing by writing trust article first)",
+        attachment: "",
+        verified: false,
+        rolledOverFrom: null
+      },
+      {
+        id: "TSK-014",
+        weekOf: "2026-09-28",
+        project: "Maigaard",
+        specialist: "Mateusz (On-site)",
+        description: "Re-crawl site this week, refresh technical recommendations as needed, and include GSC AI Overviews positive performance chart in reporting.",
+        priority: "Low",
+        status: "In Progress",
+        deadline: "2026-10-02",
+        blockers: "None",
+        attachment: "",
+        verified: false,
+        rolledOverFrom: null
+      },
+      {
+        id: "TSK-015",
+        weekOf: "2026-09-28",
+        project: "Maigaard",
+        specialist: "Paweł (Project Manager)",
+        description: "Coordinate with Anders regarding expanding client focus into AI solutions leveraging positive blog visibility.",
+        priority: "Low",
+        status: "Planning",
+        deadline: "2026-10-02",
+        blockers: "None",
+        attachment: "",
+        verified: false,
+        rolledOverFrom: null
+      },
+
+      // EXANTE
+      {
+        id: "TSK-016",
+        weekOf: "2026-09-28",
+        project: "Exante",
+        specialist: "Paweł (Project Manager)",
+        description: "September completed; verify confirmation and issue invoice Tuesday. Send escalation email with summary of unanswered topics to client contact on Wednesday.",
+        priority: "High",
+        status: "In Progress",
+        deadline: "2026-09-30",
+        blockers: "Client unresponsive to weekly outreach emails",
+        attachment: "",
+        verified: false,
+        rolledOverFrom: null
+      },
+      {
+        id: "TSK-017",
+        weekOf: "2026-09-28",
+        project: "Exante",
+        specialist: "Klaudia (AI)",
+        description: "Compile summary of unreviewed sites and unanswered article proposals by Wednesday; prepare new mention project setup similar to SAXO.",
+        priority: "Critical",
+        status: "Blocked",
+        deadline: "2026-09-30",
+        blockers: "Julia hasn't approved proposed articles or vetted new publisher domains despite weekly emails",
+        attachment: "",
+        verified: false,
+        rolledOverFrom: null
+      },
+
+      // SAXO
+      {
+        id: "TSK-018",
+        weekOf: "2026-09-28",
+        project: "SAXO",
+        specialist: "Christos (Content)",
+        description: "First Danish article completed; draft three more this week adhering strictly to client's 14 H2 structure while keeping paragraphs concise to manage translation costs.",
+        priority: "High",
+        status: "In Progress",
+        deadline: "2026-10-02",
+        blockers: "Complex client outline with 14 H2 headings leads to lengthy copy that impacts translation costs",
+        attachment: "",
+        verified: false,
+        rolledOverFrom: null
+      },
+      {
+        id: "TSK-019",
+        weekOf: "2026-09-28",
+        project: "SAXO",
+        specialist: "Paweł (Project Manager)",
+        description: "Review Danish translation quote (5,000 baseline with potential 20% discount). Send another request to Melody to push Jakub in Poland (currently OOO). Attend Wednesday Italian migration call (saxo.bg to home.saxo/it).",
+        priority: "High",
+        status: "In Progress",
+        deadline: "2026-09-30",
+        blockers: "Polish manager Jakub auto-responded out of office",
+        attachment: "",
+        verified: false,
+        rolledOverFrom: null
+      },
+      {
+        id: "TSK-020",
+        weekOf: "2026-09-28",
+        project: "SAXO",
+        specialist: "Chiara (Team Manager)",
+        description: "Coordinate with Polish external writer on remaining 4 articles (due Oct 13, requesting early drafts). Review translation quotes with Paweł.",
+        priority: "Medium",
+        status: "In Progress",
+        deadline: "2026-10-13",
+        blockers: "None",
+        attachment: "",
+        verified: false,
+        rolledOverFrom: null
+      },
+      {
+        id: "TSK-021",
+        weekOf: "2026-09-28",
+        project: "SAXO",
+        specialist: "Klaudia (AI)",
+        description: "Verify with provider copywriters whether they can write 2 Czech and 3 Polish articles matching client's in-depth style; review 5 target domains.",
+        priority: "High",
+        status: "In Progress",
+        deadline: "2026-10-02",
+        blockers: "Expect strict client feedback on PR/outreach vs website content quality standards",
+        attachment: "",
+        verified: false,
+        rolledOverFrom: null
+      },
+      {
+        id: "TSK-022",
+        weekOf: "2026-09-28",
+        project: "SAXO",
+        specialist: "Paweł (Project Manager)",
+        description: "Manage expectations and boundaries with Ruchi regarding affiliate partnership demands; clarify agency scope and reject unsustainable weekly call requests.",
+        priority: "Critical",
+        status: "Blocked",
+        deadline: "2026-09-28",
+        blockers: "Ruchi expecting agency to handle internal affiliate negotiations and requests publisher analytics data that publishers refuse to share with third parties",
+        attachment: "",
+        verified: false,
+        rolledOverFrom: null
+      }
+    ];
+
+    // Helper to guarantee clean, strongly-typed task objects without undefined values
+    function sanitizeTask(task) {
+      return {
+        id: String(task.id || AppState.getNextTaskId()),
+        weekOf: String(task.weekOf || "2026-09-28"),
+        project: String(task.project || "SAXO"),
+        specialist: String(task.specialist || "Paweł (Project Manager)"),
+        description: String(task.description || ""),
+        priority: String(task.priority || "Medium"),
+        status: String(task.status || "Planning"),
+        deadline: String(task.deadline || ""),
+        blockers: String(task.blockers || "None"),
+        attachment: String(task.attachment || ""),
+        verified: Boolean(task.verified),
+        rolledOverFrom: task.rolledOverFrom ? String(task.rolledOverFrom) : null
+      };
+    }
+
+    const AppState = {
+      projects: [...INITIAL_PROJECTS],
+      specialists: [...INITIAL_SPECIALISTS],
+      tasks: INITIAL_TASKS.map(sanitizeTask),
+      availableWeeks: ["2026-09-28"],
+      currentWeek: "2026-09-28",
+      activeWorkflowFilter: "ALL", // 'ALL' | 'MONDAY' | 'THURSDAY' | 'BLOCKED'
+      selectedTaskIds: new Set(),
+      db: null,
+      auth: null,
+      currentUser: null,
+      appId: typeof __app_id !== 'undefined' ? __app_id : 'default-tracker-app',
+      isCloudConnected: false,
+
+      getNextTaskId() {
+        return 'TSK-' + String(Date.now()).slice(-6);
+      },
+
+      loadLocalBackup() {
+        try {
+          const savedTasks = localStorage.getItem('wpt_saved_tasks_v4');
+          if (savedTasks) {
+            const parsed = JSON.parse(savedTasks);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              this.tasks = parsed.map(sanitizeTask);
+            }
+          }
+          const savedWeeks = localStorage.getItem('wpt_saved_weeks_v4');
+          if (savedWeeks) {
+            const parsedWeeks = JSON.parse(savedWeeks);
+            if (Array.isArray(parsedWeeks) && parsedWeeks.length > 0) {
+              this.availableWeeks = parsedWeeks;
+            }
+          }
+          const savedProjects = localStorage.getItem('wpt_saved_projects_v4');
+          if (savedProjects) {
+            const parsedP = JSON.parse(savedProjects);
+            if (Array.isArray(parsedP) && parsedP.length > 0) {
+              this.projects = parsedP;
+            }
+          }
+          const savedSpecialists = localStorage.getItem('wpt_saved_specialists_v4');
+          if (savedSpecialists) {
+            const parsedS = JSON.parse(savedSpecialists);
+            if (Array.isArray(parsedS) && parsedS.length > 0) {
+              this.specialists = parsedS;
+            }
+          }
+        } catch (e) {
+          console.warn("Local backup load error:", e);
+        }
+      },
+
+      persistLocalBackup() {
+        try {
+          localStorage.setItem('wpt_saved_tasks_v4', JSON.stringify(this.tasks));
+          localStorage.setItem('wpt_saved_weeks_v4', JSON.stringify(this.availableWeeks));
+          localStorage.setItem('wpt_saved_projects_v4', JSON.stringify(this.projects));
+          localStorage.setItem('wpt_saved_specialists_v4', JSON.stringify(this.specialists));
+        } catch (e) {
+          console.warn("Local storage write error:", e);
+        }
+      },
+
+      async saveTask(task) {
+        const clean = sanitizeTask(task);
+        const idx = this.tasks.findIndex(t => t.id === clean.id);
+        if (idx >= 0) {
+          this.tasks[idx] = clean;
+        } else {
+          this.tasks.unshift(clean);
+        }
+
+        // Always write to local storage backup immediately
+        this.persistLocalBackup();
+
+        // Sync to cloud Firestore when connected
+        if (this.isCloudConnected && this.currentUser && this.db) {
+          try {
+            const taskRef = doc(this.db, 'artifacts', this.appId, 'public', 'data', 'tasks', clean.id);
+            await setDoc(taskRef, clean);
+          } catch (err) {
+            console.error("Cloud save task error:", err);
+          }
+        }
+      },
+
+      async deleteTask(taskId) {
+        this.tasks = this.tasks.filter(t => t.id !== taskId);
+        this.selectedTaskIds.delete(taskId);
+        this.persistLocalBackup();
+
+        if (this.isCloudConnected && this.currentUser && this.db) {
+          try {
+            const taskRef = doc(this.db, 'artifacts', this.appId, 'public', 'data', 'tasks', taskId);
+            await deleteDoc(taskRef);
+          } catch (err) {
+            console.error("Cloud delete error:", err);
+          }
+        }
+      },
+
+      async saveSettings() {
+        this.persistLocalBackup();
+        if (this.isCloudConnected && this.currentUser && this.db) {
+          try {
+            const configRef = doc(this.db, 'artifacts', this.appId, 'public', 'data', 'config', 'settings');
+            await setDoc(configRef, {
+              projects: this.projects,
+              specialists: this.specialists,
+              availableWeeks: this.availableWeeks
+            }, { merge: true });
+          } catch (err) {
+            console.error("Cloud save settings error:", err);
+          }
+        }
+      }
+    };
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
+    function refreshIcons() {
+      if (window.lucide && typeof window.lucide.createIcons === 'function') {
+        window.lucide.createIcons();
+      }
+    }
+
+    function getStatusClass(status) {
+      switch (status) {
+        case 'Planning': return 'status-planning';
+        case 'In Progress': return 'status-in-progress';
+        case 'Blocked': return 'status-blocked font-bold';
+        case 'Ready for Client': return 'status-ready';
+        case 'Closed': return 'status-closed';
+        default: return 'bg-slate-100 text-slate-700 border-slate-200';
+      }
+    }
+
+    function getPriorityClass(priority) {
+      switch (priority) {
+        case 'Critical': return 'bg-red-50 text-red-800 border-red-200 font-bold';
+        case 'High': return 'bg-orange-50 text-orange-800 border-orange-200 font-medium';
+        case 'Medium': return 'bg-blue-50 text-blue-800 border-blue-200';
+        case 'Low': return 'bg-slate-100 text-slate-700 border-slate-200';
+        default: return 'bg-slate-100 text-slate-700 border-slate-200';
+      }
+    }
+
+    function showToast(message, type = 'info') {
+      const container = document.getElementById('toastContainer');
+      const toast = document.createElement('div');
+      
+      const bgMap = {
+        success: 'bg-emerald-800 text-white',
+        error: 'bg-rose-800 text-white',
+        warning: 'bg-amber-800 text-white',
+        info: 'bg-slate-800 text-white'
+      };
+
+      toast.className = `${bgMap[type] || bgMap.info} text-xs px-3.5 py-2.5 rounded-xl shadow-lg flex items-center gap-2 pointer-events-auto transition-all transform duration-200 translate-y-2 opacity-0 font-medium`;
+      toast.innerHTML = `<span>${escapeHtml(message)}</span>`;
+      container.appendChild(toast);
+
+      requestAnimationFrame(() => {
+        toast.classList.remove('translate-y-2', 'opacity-0');
+      });
+
+      setTimeout(() => {
+        toast.classList.add('opacity-0', 'translate-y-2');
+        setTimeout(() => toast.remove(), 250);
+      }, 3000);
+    }
+
+    function populateDropdowns() {
+      // Week Filter
+      const weekSelect = document.getElementById('weekFilter');
+      const currentVal = weekSelect.value || AppState.currentWeek;
+      weekSelect.innerHTML = `<option value="ALL">All Weeks (${AppState.availableWeeks.length})</option>`;
+      AppState.availableWeeks.forEach(w => {
+        weekSelect.innerHTML += `<option value="${w}">${w}</option>`;
+      });
+      weekSelect.value = AppState.availableWeeks.includes(currentVal) ? currentVal : (AppState.availableWeeks[0] || "2026-09-28");
+      AppState.currentWeek = weekSelect.value;
+
+      // Project Filter
+      const projectFilter = document.getElementById('projectFilter');
+      const curProj = projectFilter.value || 'ALL';
+      projectFilter.innerHTML = `<option value="ALL">All Projects (${AppState.projects.length})</option>`;
+      AppState.projects.forEach(p => {
+        projectFilter.innerHTML += `<option value="${p}">${p}</option>`;
+      });
+      projectFilter.value = curProj;
+
+      // Specialist Filter
+      const specFilter = document.getElementById('specialistFilter');
+      const curSpec = specFilter.value || 'ALL';
+      specFilter.innerHTML = `<option value="ALL">All Specialists (${AppState.specialists.length})</option>`;
+      AppState.specialists.forEach(s => {
+        specFilter.innerHTML += `<option value="${s}">${s}</option>`;
+      });
+      specFilter.value = curSpec;
+
+      // Modal Dropdowns
+      const modalProject = document.getElementById('modalProject');
+      modalProject.innerHTML = '';
+      AppState.projects.forEach(p => {
+        modalProject.innerHTML += `<option value="${p}">${p}</option>`;
+      });
+
+      const modalSpecialist = document.getElementById('modalSpecialist');
+      modalSpecialist.innerHTML = '';
+      AppState.specialists.forEach(s => {
+        modalSpecialist.innerHTML += `<option value="${s}">${s}</option>`;
+      });
+
+      // Update date picker defaults
+      const validWeek = AppState.currentWeek !== 'ALL' ? AppState.currentWeek : (AppState.availableWeeks[0] || "2026-09-28");
+      document.getElementById('modalWeekOf').value = validWeek;
+      document.getElementById('parseTargetWeek').value = validWeek;
+    }
+
+    function getFilteredTasks() {
+      const selectedWeek = document.getElementById('weekFilter').value;
+      const selectedProject = document.getElementById('projectFilter').value;
+      const selectedSpecialist = document.getElementById('specialistFilter').value;
+      const selectedStatus = document.getElementById('statusFilter').value;
+      const searchTerm = document.getElementById('searchInput').value.trim().toLowerCase();
+
+      return AppState.tasks.filter(task => {
+        if (selectedWeek !== 'ALL' && task.weekOf !== selectedWeek) return false;
+        if (selectedProject !== 'ALL' && task.project !== selectedProject) return false;
+        if (selectedSpecialist !== 'ALL' && task.specialist !== selectedSpecialist) return false;
+        if (selectedStatus !== 'ALL' && task.status !== selectedStatus) return false;
+
+        // Workflow mode tabs
+        if (AppState.activeWorkflowFilter === 'MONDAY' && task.status === 'Closed') return false;
+        if (AppState.activeWorkflowFilter === 'THURSDAY' && task.verified) return false;
+        if (AppState.activeWorkflowFilter === 'BLOCKED' && task.status !== 'Blocked') return false;
+
+        // Free search
+        if (searchTerm) {
+          const hay = `${task.project} ${task.specialist} ${task.description} ${task.blockers} ${task.status}`.toLowerCase();
+          if (!hay.includes(searchTerm)) return false;
+        }
+
+        return true;
+      });
+    }
+
+    function renderTasks() {
+      const tbody = document.getElementById('taskTableBody');
+      const emptyState = document.getElementById('emptyState');
+      tbody.innerHTML = '';
+
+      const filtered = getFilteredTasks();
+
+      // Update Counters
+      document.getElementById('metricTotal').textContent = filtered.length;
+      const blockedCount = filtered.filter(t => t.status === 'Blocked').length;
+      document.getElementById('metricBlocked').textContent = blockedCount;
+
+      const verifiedCount = filtered.filter(t => t.verified).length;
+      const verifiedPct = filtered.length > 0 ? Math.round((verifiedCount / filtered.length) * 100) : 0;
+      document.getElementById('metricVerified').textContent = `${verifiedPct}%`;
+
+      // Update Bulk Toolbar
+      const bulkContainer = document.getElementById('bulkActionsContainer');
+      const selectedCountText = document.getElementById('selectedCountText');
+      if (AppState.selectedTaskIds.size > 0) {
+        bulkContainer.classList.remove('hidden');
+        bulkContainer.classList.add('flex');
+        selectedCountText.textContent = `${AppState.selectedTaskIds.size} selected`;
+      } else {
+        bulkContainer.classList.add('hidden');
+        bulkContainer.classList.remove('flex');
+      }
+
+      if (filtered.length === 0) {
+        emptyState.classList.remove('hidden');
+        emptyState.classList.add('flex');
+        refreshIcons();
+        return;
+      }
+      emptyState.classList.add('hidden');
+      emptyState.classList.remove('flex');
+
+      filtered.forEach(task => {
+        const tr = document.createElement('tr');
+        const isChecked = AppState.selectedTaskIds.has(task.id);
+        const isClosed = task.status === 'Closed';
+
+        tr.className = `hover:bg-slate-50/80 transition-colors ${task.status === 'Blocked' ? 'bg-rose-50/40' : isChecked ? 'bg-indigo-50/40' : ''}`;
+
+        tr.innerHTML = `
+          <td class="py-2.5 px-1.5 text-center">
+            <input type="checkbox" data-task-select="${task.id}" class="w-3.5 h-3.5 rounded text-indigo-600 focus:ring-indigo-500 border-slate-300 cursor-pointer" ${isChecked ? 'checked' : ''}>
+          </td>
+          <td class="py-2.5 px-1.5 text-slate-600 font-mono text-[11px] truncate">
+            <div class="flex items-center gap-1">
+              <span>${task.weekOf}</span>
+              ${task.rolledOverFrom ? '<span title="Rolled over from ' + task.rolledOverFrom + '" class="text-[9px] font-sans font-bold bg-amber-100 text-amber-800 px-1 rounded">Rolled</span>' : ''}
+            </div>
+          </td>
+          <td class="py-2.5 px-2">
+            <span class="font-bold text-slate-900 px-2 py-0.5 bg-slate-100 rounded-md border border-slate-200/70 block truncate text-[11px]" title="${task.project}">
+              ${task.project}
+            </span>
+          </td>
+          <td class="py-2.5 px-2 text-slate-700">
+            <div class="flex items-center gap-1.5 min-w-0" title="${task.specialist}">
+              <span class="w-5 h-5 flex-shrink-0 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-[10px]">
+                ${task.specialist.charAt(0)}
+              </span>
+              <span class="truncate text-[11px] font-medium">${task.specialist}</span>
+            </div>
+          </td>
+          <td class="py-2.5 px-3 text-slate-800 leading-snug">
+            <p class="break-words text-xs ${isClosed ? 'task-closed-text' : 'font-medium'}" title="${escapeHtml(task.description)}">
+              ${escapeHtml(task.description)}
+            </p>
+          </td>
+          <td class="py-2.5 px-1.5">
+            <select data-action="change-priority" data-id="${task.id}" class="clean-select w-full text-[11px] font-medium py-1 px-1.5 rounded-lg border cursor-pointer focus:outline-none focus:ring-1 focus:ring-indigo-500 ${getPriorityClass(task.priority)}">
+              <option value="Low" ${task.priority === 'Low' ? 'selected' : ''}>Low</option>
+              <option value="Medium" ${task.priority === 'Medium' ? 'selected' : ''}>Medium</option>
+              <option value="High" ${task.priority === 'High' ? 'selected' : ''}>High</option>
+              <option value="Critical" ${task.priority === 'Critical' ? 'selected' : ''}>Critical</option>
+            </select>
+          </td>
+          <td class="py-2.5 px-1.5">
+            <select data-action="change-status" data-id="${task.id}" class="clean-select w-full text-[11px] font-semibold py-1 px-1.5 rounded-lg border cursor-pointer focus:outline-none focus:ring-1 focus:ring-indigo-500 ${getStatusClass(task.status)}">
+              <option value="Planning" ${task.status === 'Planning' ? 'selected' : ''}>Planning</option>
+              <option value="In Progress" ${task.status === 'In Progress' ? 'selected' : ''}>In Progress</option>
+              <option value="Blocked" ${task.status === 'Blocked' ? 'selected' : ''}>Blocked</option>
+              <option value="Ready for Client" ${task.status === 'Ready for Client' ? 'selected' : ''}>Ready for Client</option>
+              <option value="Closed" ${task.status === 'Closed' ? 'selected' : ''}>Closed</option>
+            </select>
+          </td>
+          <td class="py-2.5 px-1.5">
+            <input type="date" data-action="change-deadline" data-id="${task.id}" value="${task.deadline || ''}" class="w-full bg-slate-50 hover:bg-white border border-slate-200 rounded px-1 py-1 font-mono text-[10px] text-slate-700 focus:outline-none focus:ring-1 focus:ring-indigo-500 cursor-pointer" title="Due deadline">
+          </td>
+          <td class="py-2.5 px-2 text-slate-600 text-[11px]">
+            <span class="break-words ${task.blockers && task.blockers !== 'None' ? 'text-rose-700 font-semibold' : 'text-slate-400 font-normal'}" title="${escapeHtml(task.blockers || 'None')}">
+              ${escapeHtml(task.blockers || 'None')}
+            </span>
+          </td>
+          <td class="py-2.5 px-1.5 text-center">
+            ${task.attachment && task.attachment.trim() ? `
+              <a href="${escapeHtml(task.attachment)}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-[10px] font-semibold transition-colors" title="${escapeHtml(task.attachment)}">
+                <i data-lucide="paperclip" class="w-3 h-3"></i>
+                <span>Open</span>
+              </a>
+            ` : `
+              <button data-action="quick-attach" data-id="${task.id}" class="text-slate-300 hover:text-indigo-600 p-1 rounded transition-colors cursor-pointer" title="Attach document link">
+                <i data-lucide="paperclip" class="w-3.5 h-3.5"></i>
+              </button>
+            `}
+          </td>
+          <td class="py-2.5 px-1 text-center">
+            <input type="checkbox" data-action="toggle-verify" data-id="${task.id}" class="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 border-slate-300 cursor-pointer" ${task.verified ? 'checked' : ''} title="Check off during Thursday team review">
+          </td>
+          <td class="py-2.5 px-1 text-center">
+            <div class="flex items-center justify-center gap-1">
+              <button data-action="edit-task" data-id="${task.id}" class="text-slate-400 hover:text-indigo-600 p-1 rounded transition-colors cursor-pointer" title="Edit Task">
+                <i data-lucide="edit-2" class="w-3.5 h-3.5"></i>
+              </button>
+              <button data-action="delete-task" data-id="${task.id}" class="text-slate-400 hover:text-rose-600 p-1 rounded transition-colors cursor-pointer" title="Delete Task">
+                <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+              </button>
+            </div>
+          </td>
+        `;
+
+        tbody.appendChild(tr);
+      });
+
+      refreshIcons();
+    }
+
+    async function rolloverUncompletedTasks(fromWeek, toWeek) {
+      if (!fromWeek || !toWeek || fromWeek === toWeek) return 0;
+
+      // Extract open tasks (status !== 'Closed') from source week
+      const openTasks = AppState.tasks.filter(t => t.weekOf === fromWeek && t.status !== 'Closed');
+      let movedCount = 0;
+
+      for (const task of openTasks) {
+        // Prevent duplicate creation if task already exists in target week
+        const alreadyExists = AppState.tasks.some(t => 
+          t.weekOf === toWeek && 
+          t.project === task.project && 
+          t.specialist === task.specialist && 
+          t.description === task.description
+        );
+
+        if (!alreadyExists) {
+          const newTask = {
+            id: AppState.getNextTaskId(),
+            weekOf: toWeek,
+            project: task.project,
+            specialist: task.specialist,
+            description: task.description,
+            priority: task.priority,
+            status: task.status,
+            deadline: task.deadline || '',
+            blockers: task.blockers || 'None',
+            attachment: task.attachment || '',
+            verified: false,
+            rolledOverFrom: fromWeek
+          };
+          await AppState.saveTask(newTask);
+          movedCount++;
+        }
+      }
+
+      return movedCount;
+    }
+
+    function setupEventListeners() {
+      // Filters
+      document.getElementById('weekFilter').addEventListener('change', (e) => {
+        AppState.currentWeek = e.target.value;
+        renderTasks();
+      });
+
+      ['projectFilter', 'specialistFilter', 'statusFilter'].forEach(id => {
+        document.getElementById(id).addEventListener('change', renderTasks);
+      });
+
+      document.getElementById('searchInput').addEventListener('input', renderTasks);
+
+      document.getElementById('resetFiltersBtn').addEventListener('click', () => {
+        document.getElementById('weekFilter').value = 'ALL';
+        document.getElementById('projectFilter').value = 'ALL';
+        document.getElementById('specialistFilter').value = 'ALL';
+        document.getElementById('statusFilter').value = 'ALL';
+        document.getElementById('searchInput').value = '';
+        setWorkflowFilter('ALL');
+      });
+
+      // Workflow Mode Tabs
+      function setWorkflowFilter(mode) {
+        AppState.activeWorkflowFilter = mode;
+        const btnAll = document.getElementById('filterAll');
+        const btnMonday = document.getElementById('filterMonday');
+        const btnThursday = document.getElementById('filterThursday');
+        const btnBlocked = document.getElementById('filterBlocked');
+
+        [btnAll, btnMonday, btnThursday, btnBlocked].forEach(b => {
+          b.className = 'px-2.5 py-1 text-xs font-medium rounded-md text-slate-600 hover:text-slate-900 transition-all flex items-center gap-1 cursor-pointer';
+        });
+
+        const activeClass = 'px-2.5 py-1 text-xs font-semibold rounded-md transition-all bg-white text-slate-800 shadow-2xs flex items-center gap-1 cursor-pointer';
+        if (mode === 'ALL') btnAll.className = activeClass;
+        if (mode === 'MONDAY') btnMonday.className = activeClass;
+        if (mode === 'THURSDAY') btnThursday.className = activeClass;
+        if (mode === 'BLOCKED') btnBlocked.className = activeClass;
+
+        renderTasks();
+      }
+
+      document.getElementById('filterAll').addEventListener('click', () => setWorkflowFilter('ALL'));
+      document.getElementById('filterMonday').addEventListener('click', () => setWorkflowFilter('MONDAY'));
+      document.getElementById('filterThursday').addEventListener('click', () => setWorkflowFilter('THURSDAY'));
+      document.getElementById('filterBlocked').addEventListener('click', () => setWorkflowFilter('BLOCKED'));
+
+      // New Week button with automatic rollover
+      document.getElementById('addNewWeekBtn').addEventListener('click', async () => {
+        const sortedWeeks = [...AppState.availableWeeks].sort();
+        const latestWeek = sortedWeeks[sortedWeeks.length - 1] || AppState.currentWeek;
+        
+        const nextDate = new Date(latestWeek);
+        nextDate.setDate(nextDate.getDate() + 7);
+        const newWeekStr = nextDate.toISOString().slice(0, 10);
+
+        if (!AppState.availableWeeks.includes(newWeekStr)) {
+          AppState.availableWeeks.unshift(newWeekStr);
+          AppState.currentWeek = newWeekStr;
+
+          const rolledCount = await rolloverUncompletedTasks(latestWeek, newWeekStr);
+          await AppState.saveSettings();
+
+          populateDropdowns();
+          document.getElementById('weekFilter').value = newWeekStr;
+          renderTasks();
+
+          if (rolledCount > 0) {
+            showToast(`Created week of ${newWeekStr} & carried forward ${rolledCount} uncompleted task${rolledCount > 1 ? 's' : ''}`, 'success');
+          } else {
+            showToast(`Started new tracking cycle for week of ${newWeekStr}`, 'success');
+          }
+        } else {
+          showToast(`Week of ${newWeekStr} already exists`, 'info');
+        }
+      });
+
+      // Manual Rollover Button
+      document.getElementById('rolloverTasksBtn').addEventListener('click', async () => {
+        const targetWeek = AppState.currentWeek;
+        if (!targetWeek || targetWeek === 'ALL') {
+          showToast('Please select a specific week first', 'warning');
+          return;
+        }
+
+        const sortedWeeks = [...AppState.availableWeeks].sort();
+        const currentIndex = sortedWeeks.indexOf(targetWeek);
+
+        if (currentIndex <= 0) {
+          showToast('No prior week found to roll over tasks from', 'info');
+          return;
+        }
+
+        const priorWeek = sortedWeeks[currentIndex - 1];
+        const count = await rolloverUncompletedTasks(priorWeek, targetWeek);
+
+        if (count > 0) {
+          renderTasks();
+          showToast(`Rolled over ${count} open task${count > 1 ? 's' : ''} from week of ${priorWeek}`, 'success');
+        } else {
+          showToast(`All tasks from week of ${priorWeek} are closed or already present`, 'info');
+        }
+      });
+
+      // Table inline delegations
+      const tbody = document.getElementById('taskTableBody');
+
+      tbody.addEventListener('change', async (e) => {
+        const target = e.target;
+        const taskId = target.getAttribute('data-id');
+
+        if (target.getAttribute('data-action') === 'change-priority') {
+          const task = AppState.tasks.find(t => t.id === taskId);
+          if (task) {
+            task.priority = target.value;
+            await AppState.saveTask(task);
+            renderTasks();
+            showToast(`Updated priority to ${task.priority}`, 'info');
+          }
+        }
+
+        if (target.getAttribute('data-action') === 'change-status') {
+          const task = AppState.tasks.find(t => t.id === taskId);
+          if (task) {
+            task.status = target.value;
+            await AppState.saveTask(task);
+            renderTasks();
+            showToast(`Status updated to ${task.status}`, 'info');
+          }
+        }
+
+        if (target.getAttribute('data-action') === 'change-deadline') {
+          const task = AppState.tasks.find(t => t.id === taskId);
+          if (task) {
+            task.deadline = target.value;
+            await AppState.saveTask(task);
+            renderTasks();
+            showToast(task.deadline ? `Deadline set to ${task.deadline}` : 'Deadline cleared', 'info');
+          }
+        }
+
+        if (target.getAttribute('data-action') === 'toggle-verify') {
+          const task = AppState.tasks.find(t => t.id === taskId);
+          if (task) {
+            task.verified = target.checked;
+            await AppState.saveTask(task);
+            renderTasks();
+            showToast(task.verified ? 'Task verified for Thursday review' : 'Thursday verification unclicked', 'info');
+          }
+        }
+
+        if (target.hasAttribute('data-task-select')) {
+          const id = target.getAttribute('data-task-select');
+          if (target.checked) {
+            AppState.selectedTaskIds.add(id);
+          } else {
+            AppState.selectedTaskIds.delete(id);
+          }
+          renderTasks();
+        }
+      });
+
+      tbody.addEventListener('click', (e) => {
+        const btn = e.target.closest('button');
+        if (!btn) return;
+
+        const action = btn.getAttribute('data-action');
+        const taskId = btn.getAttribute('data-id');
+
+        if (action === 'edit-task') {
+          openEditModal(taskId);
+        } else if (action === 'delete-task') {
+          deleteSingleTask(taskId);
+        } else if (action === 'quick-attach') {
+          openEditModal(taskId);
+          setTimeout(() => {
+            const attInput = document.getElementById('modalAttachment');
+            if (attInput) attInput.focus();
+          }, 150);
+        }
+      });
+
+      // Select All Checkbox
+      document.getElementById('selectAllCheckbox').addEventListener('change', (e) => {
+        const filtered = getFilteredTasks();
+        if (e.target.checked) {
+          filtered.forEach(t => AppState.selectedTaskIds.add(t.id));
+        } else {
+          AppState.selectedTaskIds.clear();
+        }
+        renderTasks();
+      });
+
+      // Delete Selected Toolbar
+      document.getElementById('deleteSelectedBtn').addEventListener('click', async () => {
+        const ids = Array.from(AppState.selectedTaskIds);
+        if (ids.length === 0) return;
+
+        for (const id of ids) {
+          await AppState.deleteTask(id);
+        }
+        AppState.selectedTaskIds.clear();
+        renderTasks();
+        showToast(`Removed ${ids.length} task${ids.length > 1 ? 's' : ''}`, 'success');
+      });
+    }
+
+    async function deleteSingleTask(taskId) {
+      await AppState.deleteTask(taskId);
+      renderTasks();
+      showToast('Task removed', 'info');
+    }
+
+    function openEditModal(taskId) {
+      const task = AppState.tasks.find(t => t.id === taskId);
+      if (!task) return;
+
+      document.getElementById('modalTitle').innerHTML = '<i data-lucide="edit-3" class="w-4 h-4 text-indigo-600"></i><span>Edit Task</span>';
+      document.getElementById('editTaskId').value = task.id;
+      document.getElementById('modalWeekOf').value = task.weekOf;
+      document.getElementById('modalProject').value = task.project;
+      document.getElementById('modalSpecialist').value = task.specialist;
+      document.getElementById('modalDescription').value = task.description;
+      document.getElementById('modalPriority').value = task.priority;
+      document.getElementById('modalStatus').value = task.status;
+      document.getElementById('modalDeadline').value = task.deadline || '';
+      document.getElementById('modalBlockers').value = task.blockers || '';
+      document.getElementById('modalAttachment').value = task.attachment || '';
+      document.getElementById('modalVerified').checked = !!task.verified;
+
+      const deleteBtn = document.getElementById('modalDeleteBtn');
+      deleteBtn.classList.remove('hidden');
+      deleteBtn.onclick = async () => {
+        await deleteSingleTask(task.id);
+        closeTaskModal();
+      };
+
+      document.getElementById('taskModal').classList.remove('hidden');
+      refreshIcons();
+    }
+
+    function openAddModal() {
+      document.getElementById('modalTitle').innerHTML = '<i data-lucide="plus-circle" class="w-4 h-4 text-indigo-600"></i><span>Add New Task</span>';
+      document.getElementById('editTaskId').value = '';
+      document.getElementById('taskForm').reset();
+
+      const activeWeek = AppState.currentWeek !== 'ALL' ? AppState.currentWeek : (AppState.availableWeeks[0] || "2026-09-28");
+      document.getElementById('modalWeekOf').value = activeWeek;
+      document.getElementById('modalPriority').value = 'Medium';
+      document.getElementById('modalStatus').value = 'Planning';
+      document.getElementById('modalDeadline').value = '';
+      document.getElementById('modalBlockers').value = 'None';
+      document.getElementById('modalAttachment').value = '';
+      document.getElementById('modalVerified').checked = false;
+
+      document.getElementById('modalDeleteBtn').classList.add('hidden');
+      document.getElementById('taskModal').classList.remove('hidden');
+      refreshIcons();
+    }
+
+    function closeTaskModal() {
+      document.getElementById('taskModal').classList.add('hidden');
+    }
+
+    document.getElementById('openAddModalBtn').addEventListener('click', openAddModal);
+    document.getElementById('closeModalBtn').addEventListener('click', closeTaskModal);
+    document.getElementById('cancelModalBtn').addEventListener('click', closeTaskModal);
+
+    document.getElementById('taskForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const editId = document.getElementById('editTaskId').value;
+      const weekOf = document.getElementById('modalWeekOf').value;
+      const project = document.getElementById('modalProject').value;
+      const specialist = document.getElementById('modalSpecialist').value;
+      const description = document.getElementById('modalDescription').value.trim();
+      const priority = document.getElementById('modalPriority').value;
+      const status = document.getElementById('modalStatus').value;
+      const deadline = document.getElementById('modalDeadline').value;
+      const blockers = document.getElementById('modalBlockers').value.trim() || 'None';
+      const attachment = document.getElementById('modalAttachment').value.trim();
+      const verified = document.getElementById('modalVerified').checked;
+
+      if (!AppState.availableWeeks.includes(weekOf)) {
+        AppState.availableWeeks.unshift(weekOf);
+        await AppState.saveSettings();
+        populateDropdowns();
+      }
+
+      if (editId) {
+        const task = AppState.tasks.find(t => t.id === editId);
+        if (task) {
+          task.weekOf = weekOf;
+          task.project = project;
+          task.specialist = specialist;
+          task.description = description;
+          task.priority = priority;
+          task.status = status;
+          task.deadline = deadline;
+          task.blockers = blockers;
+          task.attachment = attachment;
+          task.verified = verified;
+          await AppState.saveTask(task);
+          showToast('Task updated', 'success');
+        }
+      } else {
+        const newTask = {
+          id: AppState.getNextTaskId(),
+          weekOf,
+          project,
+          specialist,
+          description,
+          priority,
+          status,
+          deadline,
+          blockers,
+          attachment,
+          verified,
+          rolledOverFrom: null
+        };
+        await AppState.saveTask(newTask);
+        showToast('New task added', 'success');
+      }
+
+      closeTaskModal();
+      renderTasks();
+    });
+
+    const SAMPLE_TRANSCRIPT = `Monday Team Sync - Week of Sept 28
+Paweł (Project Manager): Good morning team. Let's do a fast sync across all 6 clients.
+Chiara (Team Manager): On SAXO, I've completed the initial scoping and started planning next week's architecture review. Priority is high.
+Mateusz (On-site): On Trener, frontend work for the coach dashboard is in progress and on track. However, on Exante, I'm completely blocked because we are waiting on API access keys from their lead engineer. That's critical priority.
+Klaudia (AI): For Translyft, data migration pipelines are in progress. We don't have any blockers right now, medium priority.
+Darya (Off-site): OnRobot's client presentation draft is completed and ready for client delivery. Mark it high priority.
+Christos (Content): On Maigaard, I've finished the weekly analytics report and already sent it to the client, so we can mark that closed.`;
+
+    document.getElementById('openParseBtn').addEventListener('click', () => {
+      document.getElementById('transcriptInput').value = '';
+      const activeWeek = AppState.currentWeek !== 'ALL' ? AppState.currentWeek : (AppState.availableWeeks[0] || "2026-09-28");
+      document.getElementById('parseTargetWeek').value = activeWeek;
+      document.getElementById('parseModal').classList.remove('hidden');
+      refreshIcons();
+    });
+
+    document.getElementById('closeParseModalBtn').addEventListener('click', () => {
+      document.getElementById('parseModal').classList.add('hidden');
+    });
+
+    document.getElementById('cancelParseBtn').addEventListener('click', () => {
+      document.getElementById('parseModal').classList.add('hidden');
+    });
+
+    document.getElementById('loadSampleTranscriptBtn').addEventListener('click', () => {
+      document.getElementById('transcriptInput').value = SAMPLE_TRANSCRIPT;
+    });
+
+    function parseTranscriptDirectly(text, weekOf) {
+      const lines = text.split('\n').filter(l => l.trim().length > 0);
+      const parsedTasks = [];
+
+      lines.forEach(line => {
+        let matchedProject = null;
+        for (const p of AppState.projects) {
+          const reg = new RegExp(`\\b${p}\\b`, 'i');
+          if (reg.test(line)) {
+            matchedProject = p;
+            break;
+          }
+        }
+
+        let matchedSpecialist = null;
+        for (const s of AppState.specialists) {
+          const firstName = s.split(' ')[0];
+          const reg = new RegExp(`\\b${firstName}\\b`, 'i');
+          if (reg.test(line)) {
+            matchedSpecialist = s;
+            break;
+          }
+        }
+
+        if (matchedProject || matchedSpecialist) {
+          const project = matchedProject || AppState.projects[0];
+          const specialist = matchedSpecialist || AppState.specialists[0];
+
+          let priority = 'Medium';
+          if (/critical|urgent|asap/i.test(line)) priority = 'Critical';
+          else if (/high/i.test(line)) priority = 'High';
+          else if (/low/i.test(line)) priority = 'Low';
+
+          let status = 'In Progress';
+          let blockers = 'None';
+
+          if (/blocked|waiting|credential|stuck|delay|refuse|reject/i.test(line)) {
+            status = 'Blocked';
+            const blockerMatch = line.match(/(?:waiting on|blocked by|blocked because|waiting for|rejected)\s+([^.,;\n]+)/i);
+            blockers = blockerMatch ? blockerMatch[0] : 'Identified blocker during sync';
+          } else if (/ready for client|ready to present|prepared for client/i.test(line)) {
+            status = 'Ready for Client';
+          } else if (/closed|completed|done|finished/i.test(line)) {
+            status = 'Closed';
+          } else if (/plan|planning|scoped|initial/i.test(line)) {
+            status = 'Planning';
+          }
+
+          let cleanDesc = line
+            .replace(/^[^:]+:\s*/, '')
+            .replace(/\b(high|critical|medium|low)\s+priority\b/gi, '')
+            .trim();
+
+          if (cleanDesc.length < 5) cleanDesc = `${project} deliverables and updates`;
+
+          parsedTasks.push({
+            id: AppState.getNextTaskId(),
+            weekOf,
+            project,
+            specialist,
+            description: cleanDesc,
+            priority,
+            status,
+            deadline: '',
+            blockers,
+            attachment: '',
+            verified: status === 'Closed',
+            rolledOverFrom: null
+          });
+        }
+      });
+
+      return parsedTasks;
+    }
+
+    document.getElementById('executeParseBtn').addEventListener('click', async () => {
+      const text = document.getElementById('transcriptInput').value.trim();
+      const weekOf = document.getElementById('parseTargetWeek').value;
+
+      if (!text) {
+        showToast('Please paste a transcript first', 'warning');
+        return;
+      }
+
+      const newTasks = parseTranscriptDirectly(text, weekOf);
+
+      if (newTasks.length === 0) {
+        showToast('Could not identify any project or specialist mentions', 'error');
+        return;
+      }
+
+      if (!AppState.availableWeeks.includes(weekOf)) {
+        AppState.availableWeeks.unshift(weekOf);
+        await AppState.saveSettings();
+      }
+
+      for (const t of newTasks) {
+        await AppState.saveTask(t);
+      }
+
+      populateDropdowns();
+      document.getElementById('weekFilter').value = weekOf;
+      AppState.currentWeek = weekOf;
+      renderTasks();
+
+      document.getElementById('parseModal').classList.add('hidden');
+      showToast(`Successfully imported ${newTasks.length} tasks!`, 'success');
+    });
+
+    document.getElementById('copySheetsBtn').addEventListener('click', () => {
+      const filtered = getFilteredTasks();
+      if (filtered.length === 0) {
+        showToast('No tasks visible to copy', 'warning');
+        return;
+      }
+
+      let tsv = ["Week Of", "Project / Client", "Specialist", "Task Description", "Priority", "Status", "Deadline", "Blockers / Notes", "Attachment", "Thursday Verification"].join('\t') + '\n';
+
+      filtered.forEach(t => {
+        tsv += [
+          t.weekOf,
+          t.project,
+          t.specialist,
+          `"${(t.description || '').replace(/"/g, '""')}"`,
+          t.priority,
+          t.status,
+          t.deadline || '',
+          `"${(t.blockers || '').replace(/"/g, '""')}"`,
+          `"${(t.attachment || '').replace(/"/g, '""')}"`,
+          t.verified ? 'Yes' : 'No'
+        ].join('\t') + '\n';
+      });
+
+      const temp = document.createElement('textarea');
+      temp.value = tsv;
+      temp.style.position = 'fixed';
+      temp.style.opacity = '0';
+      document.body.appendChild(temp);
+      temp.select();
+      document.execCommand('copy');
+      document.body.removeChild(temp);
+
+      showToast(`Copied ${filtered.length} rows for Google Sheets! (Ctrl+V)`, 'success');
+    });
+
+    document.getElementById('exportCsvBtn').addEventListener('click', () => {
+      const filtered = getFilteredTasks();
+      if (filtered.length === 0) {
+        showToast('No tasks visible to export', 'warning');
+        return;
+      }
+
+      let csv = ["Week Of", "Project / Client", "Specialist", "Task Description", "Priority", "Status", "Deadline", "Blockers / Notes", "Attachment", "Thursday Verification"].join(',') + '\n';
+
+      filtered.forEach(t => {
+        csv += [
+          `"${t.weekOf}"`,
+          `"${t.project}"`,
+          `"${t.specialist}"`,
+          `"${(t.description || '').replace(/"/g, '""')}"`,
+          `"${t.priority}"`,
+          `"${t.status}"`,
+          `"${t.deadline || ''}"`,
+          `"${(t.blockers || '').replace(/"/g, '""')}"`,
+          `"${(t.attachment || '').replace(/"/g, '""')}"`,
+          `"${t.verified ? 'Yes' : 'No'}"`
+        ].join(',') + '\n';
+      });
+
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.setAttribute('href', url);
+      link.setAttribute('download', `Project_Tracker_${new Date().toISOString().slice(0, 10)}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      showToast('Exported CSV file', 'info');
+    });
+
+    function renderManageLists() {
+      const pList = document.getElementById('projectsList');
+      pList.innerHTML = '';
+      AppState.projects.forEach(p => {
+        const badge = document.createElement('span');
+        badge.className = 'inline-flex items-center gap-1 px-2 py-0.5 rounded bg-white border border-slate-200 text-xs font-semibold text-slate-800';
+        badge.innerHTML = `<span>${p}</span><button data-remove-project="${p}" class="text-slate-400 hover:text-rose-600 cursor-pointer">&times;</button>`;
+        pList.appendChild(badge);
+      });
+
+      const sList = document.getElementById('specialistsList');
+      sList.innerHTML = '';
+      AppState.specialists.forEach(s => {
+        const badge = document.createElement('span');
+        badge.className = 'inline-flex items-center gap-1 px-2 py-0.5 rounded bg-white border border-slate-200 text-xs font-semibold text-slate-800';
+        badge.innerHTML = `<span>${s}</span><button data-remove-specialist="${s}" class="text-slate-400 hover:text-rose-600 cursor-pointer">&times;</button>`;
+        sList.appendChild(badge);
+      });
+    }
+
+    document.getElementById('openManageModalBtn').addEventListener('click', () => {
+      renderManageLists();
+      document.getElementById('manageModal').classList.remove('hidden');
+      refreshIcons();
+    });
+
+    document.getElementById('closeManageModalBtn').addEventListener('click', () => {
+      document.getElementById('manageModal').classList.add('hidden');
+    });
+
+    document.getElementById('doneManageBtn').addEventListener('click', () => {
+      document.getElementById('manageModal').classList.add('hidden');
+    });
+
+    document.getElementById('addProjectBtn').addEventListener('click', async () => {
+      const input = document.getElementById('newProjectInput');
+      const val = input.value.trim();
+      if (val && !AppState.projects.includes(val)) {
+        AppState.projects.push(val);
+        await AppState.saveSettings();
+        populateDropdowns();
+        renderManageLists();
+        input.value = '';
+        showToast(`Added client: ${val}`, 'success');
+      }
+    });
+
+    document.getElementById('addSpecialistBtn').addEventListener('click', async () => {
+      const input = document.getElementById('newSpecialistInput');
+      const val = input.value.trim();
+      if (val && !AppState.specialists.includes(val)) {
+        AppState.specialists.push(val);
+        await AppState.saveSettings();
+        populateDropdowns();
+        renderManageLists();
+        input.value = '';
+        showToast(`Added specialist: ${val}`, 'success');
+      }
+    });
+
+    document.getElementById('projectsList').addEventListener('click', async (e) => {
+      const p = e.target.getAttribute('data-remove-project');
+      if (p) {
+        if (AppState.projects.length <= 1) {
+          showToast('You must keep at least 1 project', 'warning');
+          return;
+        }
+        AppState.projects = AppState.projects.filter(x => x !== p);
+        await AppState.saveSettings();
+        populateDropdowns();
+        renderManageLists();
+        renderTasks();
+      }
+    });
+
+    document.getElementById('specialistsList').addEventListener('click', async (e) => {
+      const s = e.target.getAttribute('data-remove-specialist');
+      if (s) {
+        if (AppState.specialists.length <= 1) {
+          showToast('You must keep at least 1 specialist', 'warning');
+          return;
+        }
+        AppState.specialists = AppState.specialists.filter(x => x !== s);
+        await AppState.saveSettings();
+        populateDropdowns();
+        renderManageLists();
+        renderTasks();
+      }
+    });
+
+    document.getElementById('resetDemoBtn').addEventListener('click', async () => {
+      try {
+        localStorage.removeItem('wpt_saved_tasks_v4');
+        localStorage.removeItem('wpt_saved_weeks_v4');
+        localStorage.removeItem('wpt_saved_projects_v4');
+        localStorage.removeItem('wpt_saved_specialists_v4');
+      } catch (e) {}
+
+      AppState.projects = [...INITIAL_PROJECTS];
+      AppState.specialists = [...INITIAL_SPECIALISTS];
+      AppState.tasks = INITIAL_TASKS.map(sanitizeTask);
+      AppState.availableWeeks = ["2026-09-28"];
+      AppState.currentWeek = "2026-09-28";
+      await AppState.saveSettings();
+      for (const t of AppState.tasks) {
+        await AppState.saveTask(t);
+      }
+      populateDropdowns();
+      renderManageLists();
+      renderTasks();
+      showToast('Reset to default tracker template', 'info');
+      document.getElementById('manageModal').classList.add('hidden');
+    });
+
+    // Cloud Database Initialization with Graceful Local Fallback
+    async function initCloudSync() {
+      const syncBadge = document.getElementById('syncBadge');
+      const syncText = document.getElementById('syncText');
+
+      if (typeof __firebase_config === 'undefined') {
+        if (syncBadge && syncText) {
+          syncText.textContent = "Saved Locally";
+          syncBadge.className = "text-[10px] px-2 py-0.5 rounded-full font-medium bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1";
+        }
+        return;
+      }
+
+      try {
+        const firebaseConfig = JSON.parse(__firebase_config);
+        const app = initializeApp(firebaseConfig);
+        AppState.db = getFirestore(app);
+        AppState.auth = getAuth(app);
+
+        let userCredential;
+        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+          userCredential = await signInWithCustomToken(AppState.auth, __initial_auth_token);
+        } else {
+          userCredential = await signInAnonymously(AppState.auth);
+        }
+
+        const user = userCredential?.user || AppState.auth.currentUser;
+        if (!user) {
+          console.warn("User auth not ready for cloud sync");
+          return;
+        }
+
+        AppState.currentUser = user;
+        AppState.isCloudConnected = true;
+
+        if (syncBadge && syncText) {
+          syncText.textContent = "Cloud Synced";
+          syncBadge.className = "text-[10px] px-2 py-0.5 rounded-full font-medium bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1";
+        }
+
+        // Live Tasks Listener (Strict path: /artifacts/{appId}/public/data/tasks)
+        const tasksCol = collection(AppState.db, 'artifacts', AppState.appId, 'public', 'data', 'tasks');
+        onSnapshot(tasksCol, (snapshot) => {
+          if (!snapshot.empty) {
+            const cloudTasks = [];
+            snapshot.forEach(docSnap => {
+              cloudTasks.push(sanitizeTask({ id: docSnap.id, ...docSnap.data() }));
+            });
+            AppState.tasks = cloudTasks;
+            const weekSet = new Set(AppState.availableWeeks);
+            cloudTasks.forEach(t => { if (t.weekOf) weekSet.add(t.weekOf); });
+            AppState.availableWeeks = Array.from(weekSet).sort().reverse();
+            AppState.persistLocalBackup();
+            populateDropdowns();
+            renderTasks();
+          } else {
+            // Seed initial tasks if empty in cloud
+            INITIAL_TASKS.forEach(t => AppState.saveTask(t));
+          }
+        }, (err) => {
+          console.warn("Tasks cloud sync listener warning:", err);
+        });
+
+        // Live Config Listener (Strict path: /artifacts/{appId}/public/data/config)
+        const configCol = collection(AppState.db, 'artifacts', AppState.appId, 'public', 'data', 'config');
+        onSnapshot(configCol, (snapshot) => {
+          snapshot.forEach(docSnap => {
+            if (docSnap.id === 'settings') {
+              const data = docSnap.data();
+              if (Array.isArray(data.projects) && data.projects.length) AppState.projects = data.projects;
+              if (Array.isArray(data.specialists) && data.specialists.length) AppState.specialists = data.specialists;
+              if (Array.isArray(data.availableWeeks) && data.availableWeeks.length) AppState.availableWeeks = data.availableWeeks;
+              AppState.persistLocalBackup();
+              populateDropdowns();
+              renderTasks();
+            }
+          });
+        }, (err) => {
+          console.warn("Config sync warning:", err);
+        });
+
+      } catch (err) {
+        console.warn("Cloud connection fallback to local mode:", err);
+        if (syncBadge && syncText) {
+          syncText.textContent = "Saved Locally";
+          syncBadge.className = "text-[10px] px-2 py-0.5 rounded-full font-medium bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1";
+        }
+      }
+    }
+
+    // App Bootstrapper
+    function startApp() {
+      AppState.loadLocalBackup();
+      populateDropdowns();
+      setupEventListeners();
+      renderTasks();
+      refreshIcons();
+      initCloudSync();
+    }
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', startApp);
+    } else {
+      startApp();
+    }
+  </script>
+</body>
+</html>
