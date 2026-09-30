@@ -520,7 +520,15 @@ const app = initializeApp(firebaseConfig);
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
     import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
     import { getFirestore, doc, setDoc, deleteDoc, onSnapshot, collection } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-
+const firebaseConfig = {
+  apiKey: "AIzaSyCLEUbzdFZ9HNEcCwrkZkSkl5yRZL_NCFE",
+  authDomain: "weekly-tracker-app.firebaseapp.com",
+  projectId: "weekly-tracker-app",
+  storageBucket: "weekly-tracker-app.firebasestorage.app",
+  messagingSenderId: "1072251441232",
+  appId: "1:1072251441232:web:27378a59dcf18f1204c155"
+};
+const app = initializeApp(firebaseConfig);
     const INITIAL_PROJECTS = ["SAXO", "Trener", "Translyft", "OnRobot", "Maigaard", "Exante"];
     const INITIAL_SPECIALISTS = [
       "Paweł (Project Manager)",
@@ -1953,31 +1961,33 @@ Christos (Content): On Maigaard, I've finished the weekly analytics report and a
       const syncBadge = document.getElementById('syncBadge');
       const syncText = document.getElementById('syncText');
 
-      if (typeof __firebase_config === 'undefined') {
-        if (syncBadge && syncText) {
-          syncText.textContent = "Saved Locally";
-          syncBadge.className = "text-[10px] px-2 py-0.5 rounded-full font-medium bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1";
-        }
         return;
       }
 
-      try {
-        const firebaseConfig = JSON.parse(__firebase_config);
-        const app = initializeApp(firebaseConfig);
-        AppState.db = getFirestore(app);
-        AppState.auth = getAuth(app);
+     try {
+  const app = initializeApp(firebaseConfig);
 
-        let userCredential;
-        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-          userCredential = await signInWithCustomToken(AppState.auth, __initial_auth_token);
-        } else {
-          userCredential = await signInAnonymously(AppState.auth);
-        }
+  AppState.db = getFirestore(app);
+  AppState.auth = getAuth(app);
 
-        const user = userCredential?.user || AppState.auth.currentUser;
-        if (!user) {
-          console.warn("User auth not ready for cloud sync");
-          return;
+  const userCredential = await signInAnonymously(AppState.auth);
+
+  const user = userCredential.user;
+
+  if (!user) {
+    throw new Error("Firebase authentication failed");
+  }
+
+  AppState.currentUser = user;
+  AppState.isCloudConnected = true;
+
+  if (syncBadge && syncText) {
+    syncText.textContent = "Cloud Synced";
+    syncBadge.className =
+      "text-[10px] px-2 py-0.5 rounded-full font-medium " +
+      "bg-emerald-50 text-emerald-700 border border-emerald-200 " +
+      "flex items-center gap-1";
+  }
         }
 
         AppState.currentUser = user;
@@ -2005,7 +2015,8 @@ Christos (Content): On Maigaard, I've finished the weekly analytics report and a
             renderTasks();
           } else {
             // Seed initial tasks if empty in cloud
-            INITIAL_TASKS.forEach(t => AppState.saveTask(t));
+            AppState.tasks.forEach(t => AppState.saveTask(t));
+AppState.saveSettings();
           }
         }, (err) => {
           console.warn("Tasks cloud sync listener warning:", err);
