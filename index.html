@@ -100,6 +100,23 @@
       text-decoration: line-through;
       color: #94a3b8 !important;
     }
+	// Import the functions you need from the SDKs you need
+import { initializeApp } from "firebase/app";
+// TODO: Add SDKs for Firebase products that you want to use
+// https://firebase.google.com/docs/web/setup#available-libraries
+
+// Your web app's Firebase configuration
+const firebaseConfig = {
+  apiKey: "AIzaSyCLEUbzdFZ9HNEcCwrkZkSkl5yRZL_NCFE",
+  authDomain: "weekly-tracker-app.firebaseapp.com",
+  projectId: "weekly-tracker-app",
+  storageBucket: "weekly-tracker-app.firebasestorage.app",
+  messagingSenderId: "1072251441232",
+  appId: "1:1072251441232:web:27378a59dcf18f1204c155"
+};
+
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
   </style>
 </head>
 <body class="h-full flex flex-col font-sans text-slate-800 antialiased overflow-x-hidden">
